@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Share Your Wedding Photos</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, sans-serif;
+      background: #faf8f5;
+      color: #333;
+      min-height: 100vh;
+    }
+
+    /* ── Header ── */
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.875rem 1.25rem;
+      background: #fff;
+      border-bottom: 1px solid #ede8e1;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    header .brand {
+      font-size: 1.05rem;
+      font-weight: 400;
+      letter-spacing: 0.04em;
+      color: #666;
+    }
+    .login-link {
+      font-size: 0.8rem;
+      padding: 0.35rem 0.85rem;
+      border: 1px solid #c9a9a6;
+      border-radius: 20px;
+      color: #c9a9a6;
+      text-decoration: none;
+      transition: background 0.15s;
+    }
+    .login-link:hover { background: #fdf0ef; }
+
+    /* ── Main card ── */
+    main {
+      max-width: 440px;
+      margin: 2.5rem auto;
+      padding: 0 1rem;
+    }
+    .card {
+      background: #fff;
+      border-radius: 12px;
+      padding: 2rem 1.75rem;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+    }
+    .card h1 {
+      font-size: 1.55rem;
+      font-weight: 300;
+      text-align: center;
+      color: #444;
+      margin-bottom: 0.3rem;
+    }
+    .subtitle {
+      text-align: center;
+      color: #999;
+      font-size: 0.85rem;
+      margin-bottom: 1.75rem;
+    }
+
+    /* ── Form elements ── */
+    label {
+      display: block;
+      font-size: 0.8rem;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #888;
+      margin-bottom: 0.35rem;
+    }
+    input[type="text"] {
+      width: 100%;
+      padding: 0.65rem 0.85rem;
+      border: 1.5px solid #ddd;
+      border-radius: 8px;
+      font-size: 1rem;
+      outline: none;
+      transition: border-color 0.15s;
+      margin-bottom: 1.25rem;
+      background: #fdfcfb;
+    }
+    input[type="text"]:focus { border-color: #c9a9a6; }
+
+    /* ── Drop zone ── */
+    .drop-zone {
+      border: 2px dashed #ddd;
+      border-radius: 10px;
+      padding: 2rem 1rem;
+      text-align: center;
+      cursor: pointer;
+      position: relative;
+      transition: border-color 0.15s, background 0.15s;
+      margin-bottom: 1rem;
+    }
+    .drop-zone.over, .drop-zone:hover {
+      border-color: #c9a9a6;
+      background: #fef8f7;
+    }
+    .drop-zone input[type="file"] {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      cursor: pointer;
+      font-size: 0; /* hides iOS tooltip */
+    }
+    .drop-zone .dz-icon { font-size: 2.25rem; margin-bottom: 0.5rem; }
+    .drop-zone .dz-primary { font-weight: 500; color: #555; font-size: 0.95rem; }
+    .drop-zone .dz-secondary { color: #aaa; font-size: 0.78rem; margin-top: 0.25rem; }
+
+    /* ── Preview grid ── */
+    .preview-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+      margin-bottom: 1rem;
+    }
+    .preview-item {
+      position: relative;
+      aspect-ratio: 1;
+      border-radius: 6px;
+      overflow: hidden;
+      background: #f0ede9;
+    }
+    .preview-item img,
+    .preview-item video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .preview-badge {
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      padding: 3px 5px;
+      font-size: 0.62rem;
+      text-align: center;
+      font-weight: 600;
+      letter-spacing: 0.03em;
+      transition: background 0.2s;
+    }
+    .badge-pending  { background: rgba(0,0,0,0.4);   color: #fff; }
+    .badge-uploading{ background: rgba(201,169,166,0.9); color: #fff; }
+    .badge-done     { background: rgba(76,175,80,0.85);  color: #fff; }
+    .badge-error    { background: rgba(211,47,47,0.85);  color: #fff; }
+
+    /* ── Upload button ── */
+    .btn-upload {
+      display: block;
+      width: 100%;
+      padding: 0.8rem;
+      background: #c9a9a6;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.15s, opacity 0.15s;
+      letter-spacing: 0.02em;
+    }
+    .btn-upload:hover:not(:disabled) { background: #b89490; }
+    .btn-upload:disabled { opacity: 0.55; cursor: not-allowed; }
+
+    /* ── Toast message ── */
+    .toast {
+      margin-top: 1rem;
+      padding: 0.75rem 1rem;
+      border-radius: 8px;
+      font-size: 0.875rem;
+      text-align: center;
+      display: none;
+    }
+    .toast.success { background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; }
+    .toast.error   { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
+    .toast.info    { background: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe; }
+  </style>
+</head>
+<body>
+
+<header>
+  <span class="brand">The Wedding &#x1F4AB;</span>
+  <a href="/gallery" class="login-link">Couple login</a>
+</header>
+
+<main>
+  <div class="card">
+    <h1>Share your photos</h1>
+    <p class="subtitle">Help us capture every moment ✨</p>
+
+    <label for="guestName">Your name</label>
+    <input type="text" id="guestName" placeholder="e.g. Maria Papadopoulos"
+           autocomplete="name" autocorrect="off" spellcheck="false" />
+
+    <label>Photos &amp; videos</label>
+    <div class="drop-zone" id="dropZone">
+      <!--
+        No `capture` attribute — that forces camera-only on some phones.
+        Without it, iOS/Android shows "Take Photo", "Photo Library", etc.
+        accept="image/*,video/*" still restricts the picker to media.
+      -->
+      <input type="file" id="fileInput" multiple accept="image/*,video/*" />
+      <div class="dz-icon">&#128247;</div>
+      <p class="dz-primary">Tap to choose or drag &amp; drop</p>
+      <p class="dz-secondary">Photos &amp; videos · up to 200 MB each</p>
+    </div>
+
+    <div class="preview-grid" id="previewGrid" style="display:none"></div>
+
+    <button class="btn-upload" id="uploadBtn" disabled>Choose photos first</button>
+
+    <div class="toast" id="toast"></div>
+  </div>
+</main>
+
+<script>
+  "use strict";
+
+  const MAX_SIZE = 200 * 1024 * 1024;
+  const ALLOWED = new Set([
+    "image/jpeg","image/png","image/gif","image/webp",
+    "image/heic","image/heif",
+    "video/mp4","video/quicktime","video/x-msvideo",
+  ]);
+
+  const nameInput   = document.getElementById("guestName");
+  const fileInput   = document.getElementById("fileInput");
+  const dropZone    = document.getElementById("dropZone");
+  const previewGrid = document.getElementById("previewGrid");
+  const uploadBtn   = document.getElementById("uploadBtn");
+  const toast       = document.getElementById("toast");
+
+  let selectedFiles = [];
+
+  // ── File selection ──────────────────────────────────────────────────────
+
+  fileInput.addEventListener("change", () => {
+    selectedFiles = Array.from(fileInput.files);
+    renderPreviews();
+  });
+
+  // Drag-and-drop (desktop bonus)
+  dropZone.addEventListener("dragover", e => {
+    e.preventDefault();
+    dropZone.classList.add("over");
+  });
+  dropZone.addEventListener("dragleave", () => dropZone.classList.remove("over"));
+  dropZone.addEventListener("drop", e => {
+    e.preventDefault();
+    dropZone.classList.remove("over");
+    selectedFiles = Array.from(e.dataTransfer.files);
+    renderPreviews();
+  });
+
+  function renderPreviews() {
+    previewGrid.innerHTML = "";
+    previewGrid.style.display = selectedFiles.length ? "grid" : "none";
+
+    selectedFiles.forEach((file, i) => {
+      const item = document.createElement("div");
+      item.className = "preview-item";
+      item.id = `pi-${i}`;
+
+      // URL.createObjectURL is purely local — nothing is sent to the server here.
+      const src = URL.createObjectURL(file);
+      if (file.type.startsWith("video/")) {
+        const v = document.createElement("video");
+        v.src = src;
+        v.muted = true;
+        v.playsInline = true;
+        v.preload = "metadata";
+        item.appendChild(v);
+      } else {
+        const img = new Image();
+        img.src = src;
+        img.alt = file.name;
+        item.appendChild(img);
+      }
+
+      const badge = document.createElement("div");
+      badge.className = "preview-badge badge-pending";
+      badge.textContent = truncate(file.name, 14);
+      item.appendChild(badge);
+
+      previewGrid.appendChild(item);
+    });
+
+    uploadBtn.disabled = false;
+    const n = selectedFiles.length;
+    uploadBtn.textContent = `Upload ${n} photo${n === 1 ? "" : "s"}`;
+    hideToast();
+  }
+
+  // ── Upload ──────────────────────────────────────────────────────────────
+
+  uploadBtn.addEventListener("click", async () => {
+    const name = nameInput.value.trim();
+    if (!name) {
+      nameInput.focus();
+      showToast("Please enter your name first.", "error");
+      return;
+    }
+
+    // Client-side guard (server also validates)
+    const bad = selectedFiles.filter(f => !ALLOWED.has(f.type) || f.size > MAX_SIZE);
+    if (bad.length) {
+      showToast(
+        `${bad.length} file${bad.length > 1 ? "s" : ""} skipped: unsupported type or over 200 MB.`,
+        "error"
+      );
+      selectedFiles = selectedFiles.filter(f => ALLOWED.has(f.type) && f.size <= MAX_SIZE);
+      if (!selectedFiles.length) return;
+    }
+
+    uploadBtn.disabled = true;
+    uploadBtn.textContent = "Uploading…";
+    hideToast();
+
+    let ok = 0, fail = 0;
+
+    for (let i = 0; i < selectedFiles.length; i++) {
+      const file = selectedFiles[i];
+      setBadge(i, "uploading", "Uploading…");
+
+      try {
+        // Step 1 — ask our server for a presigned PUT URL.
+        // The server validates type + size and returns a time-limited URL.
+        const res = await fetch("/api/upload-url", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            filename:     file.name,
+            content_type: file.type,
+            guest_name:   name,
+            file_size:    file.size,
+          }),
+        });
+
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.detail || `Server error ${res.status}`);
+        }
+
+        const { url } = await res.json();
+
+        // Step 2 — PUT the file DIRECTLY to R2.
+        // Our server is NOT in the data path; R2 receives the bytes.
+        const put = await fetch(url, {
+          method: "PUT",
+          headers: { "Content-Type": file.type },
+          body: file,
+        });
+
+        if (!put.ok) throw new Error(`R2 rejected upload: ${put.status}`);
+
+        setBadge(i, "done", "✓ Done");
+        ok++;
+      } catch (err) {
+        setBadge(i, "error", "✗ Failed");
+        console.error("Upload error for", file.name, err);
+        fail++;
+      }
+    }
+
+    uploadBtn.textContent = "Upload more";
+    uploadBtn.disabled = false;
+
+    if (fail === 0) {
+      showToast(`All ${ok} file${ok === 1 ? "" : "s"} uploaded! Thank you 🎉`, "success");
+    } else if (ok === 0) {
+      showToast(`All uploads failed. Check your connection and try again.`, "error");
+    } else {
+      showToast(`${ok} uploaded, ${fail} failed. You can retry the failed ones.`, "info");
+    }
+  });
+
+  // ── Utilities ────────────────────────────────────────────────────────────
+
+  function setBadge(index, type, text) {
+    const item = document.getElementById(`pi-${index}`);
+    if (!item) return;
+    const badge = item.querySelector(".preview-badge");
+    badge.className = `preview-badge badge-${type}`;
+    badge.textContent = text;
+  }
+
+  function showToast(msg, type) {
+    toast.textContent = msg;
+    toast.className = `toast ${type}`;
+    toast.style.display = "block";
+  }
+
+  function hideToast() {
+    toast.style.display = "none";
+  }
+
+  function truncate(str, max) {
+    return str.length > max ? str.slice(0, max - 1) + "…" : str;
+  }
+</script>
+</body>
+</html>

@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gallery — Wedding Photos</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, sans-serif;
+      background: #faf8f5;
+      color: #333;
+      min-height: 100vh;
+    }
+
+    /* ── Header ── */
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.875rem 1.25rem;
+      background: #fff;
+      border-bottom: 1px solid #ede8e1;
+      position: sticky;
+      top: 0;
+      z-index: 20;
+    }
+    header .brand { font-size: 1.05rem; font-weight: 400; letter-spacing: 0.04em; color: #666; }
+    .header-actions { display: flex; gap: 0.5rem; align-items: center; }
+    .btn-sm {
+      font-size: 0.8rem;
+      padding: 0.35rem 0.85rem;
+      border-radius: 20px;
+      cursor: pointer;
+      border: 1px solid;
+      text-decoration: none;
+      transition: background 0.15s;
+    }
+    .btn-outline {
+      border-color: #c9a9a6;
+      color: #c9a9a6;
+      background: transparent;
+    }
+    .btn-outline:hover { background: #fdf0ef; }
+    .btn-solid {
+      border-color: #c9a9a6;
+      background: #c9a9a6;
+      color: #fff;
+    }
+    .btn-solid:hover { background: #b89490; border-color: #b89490; }
+    .btn-danger {
+      border-color: #e0a0a0;
+      color: #c0605e;
+      background: transparent;
+    }
+    .btn-danger:hover { background: #fef2f2; }
+
+    /* ── Login screen ── */
+    #loginScreen {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: calc(100vh - 57px);
+      padding: 2rem 1rem;
+    }
+    .login-card {
+      background: #fff;
+      border-radius: 12px;
+      padding: 2.5rem 2rem;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+      width: 100%;
+      max-width: 360px;
+    }
+    .login-card h1 {
+      font-size: 1.4rem;
+      font-weight: 300;
+      text-align: center;
+      color: #444;
+      margin-bottom: 0.3rem;
+    }
+    .login-subtitle {
+      text-align: center;
+      color: #999;
+      font-size: 0.85rem;
+      margin-bottom: 1.75rem;
+    }
+    .field-label {
+      display: block;
+      font-size: 0.78rem;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #888;
+      margin-bottom: 0.35rem;
+    }
+    input[type="password"] {
+      width: 100%;
+      padding: 0.65rem 0.85rem;
+      border: 1.5px solid #ddd;
+      border-radius: 8px;
+      font-size: 1rem;
+      outline: none;
+      transition: border-color 0.15s;
+      margin-bottom: 1rem;
+      background: #fdfcfb;
+    }
+    input[type="password"]:focus { border-color: #c9a9a6; }
+    .btn-login {
+      display: block;
+      width: 100%;
+      padding: 0.8rem;
+      background: #c9a9a6;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.15s;
+      letter-spacing: 0.02em;
+    }
+    .btn-login:hover:not(:disabled) { background: #b89490; }
+    .btn-login:disabled { opacity: 0.55; cursor: not-allowed; }
+    .login-error {
+      margin-top: 0.75rem;
+      padding: 0.6rem 0.85rem;
+      background: #fef2f2;
+      color: #991b1b;
+      border: 1px solid #fecaca;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      text-align: center;
+      display: none;
+    }
+
+    /* ── Gallery screen ── */
+    #galleryScreen { display: none; padding: 1.5rem 1.25rem 3rem; }
+
+    .stats-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1.5rem;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+    .stats-bar .count { font-size: 0.875rem; color: #888; }
+
+    /* Guest section */
+    .guest-section { margin-bottom: 2.5rem; }
+    .guest-header {
+      display: flex;
+      align-items: baseline;
+      gap: 0.5rem;
+      margin-bottom: 0.75rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid #ede8e1;
+    }
+    .guest-name {
+      font-size: 1rem;
+      font-weight: 500;
+      color: #555;
+      text-transform: capitalize;
+      letter-spacing: 0.02em;
+    }
+    .guest-count { font-size: 0.78rem; color: #aaa; }
+
+    /* Photo grid */
+    .photo-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: 8px;
+    }
+    .photo-thumb {
+      aspect-ratio: 1;
+      border-radius: 6px;
+      overflow: hidden;
+      cursor: pointer;
+      background: #ede8e1;
+      position: relative;
+      transition: transform 0.12s;
+    }
+    .photo-thumb:hover { transform: scale(1.02); }
+    .photo-thumb img,
+    .photo-thumb video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .video-badge {
+      position: absolute;
+      top: 5px; right: 5px;
+      background: rgba(0,0,0,0.55);
+      color: #fff;
+      font-size: 0.65rem;
+      padding: 2px 5px;
+      border-radius: 4px;
+    }
+
+    /* Empty / loading states */
+    .state-msg {
+      text-align: center;
+      padding: 4rem 1rem;
+      color: #aaa;
+      font-size: 0.9rem;
+    }
+    .state-msg .icon { font-size: 2.5rem; display: block; margin-bottom: 0.5rem; }
+
+    /* ── Lightbox ── */
+    #lightbox {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.92);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+    }
+    #lightbox.open { display: flex; }
+    #lightbox img,
+    #lightbox video {
+      max-width: 92vw;
+      max-height: 82vh;
+      border-radius: 4px;
+      object-fit: contain;
+    }
+    #lightbox video { background: #000; }
+
+    .lb-controls {
+      display: flex;
+      gap: 1rem;
+      margin-top: 1rem;
+      align-items: center;
+    }
+    .lb-btn {
+      background: rgba(255,255,255,0.15);
+      border: none;
+      color: #fff;
+      border-radius: 6px;
+      padding: 0.45rem 1rem;
+      cursor: pointer;
+      font-size: 0.9rem;
+      transition: background 0.15s;
+    }
+    .lb-btn:hover { background: rgba(255,255,255,0.3); }
+    .lb-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+    .lb-counter { color: rgba(255,255,255,0.6); font-size: 0.85rem; min-width: 70px; text-align: center; }
+    .lb-close {
+      position: absolute;
+      top: 1rem; right: 1rem;
+      background: none;
+      border: none;
+      color: #fff;
+      font-size: 1.75rem;
+      cursor: pointer;
+      line-height: 1;
+      opacity: 0.7;
+    }
+    .lb-close:hover { opacity: 1; }
+    .lb-caption { color: rgba(255,255,255,0.55); font-size: 0.78rem; margin-top: 0.5rem; }
+    .lb-download {
+      position: absolute;
+      bottom: 1rem; right: 1rem;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <span class="brand">Wedding Gallery &#x1F4AB;</span>
+  <div class="header-actions" id="headerActions" style="display:none">
+    <button class="btn-sm btn-outline" id="refreshBtn" title="Reload photos">&#8635; Refresh</button>
+    <button class="btn-sm btn-solid"   id="downloadBtn">&#8595; Download all</button>
+    <button class="btn-sm btn-danger"  id="logoutBtn">Logout</button>
+  </div>
+</header>
+
+<!-- Login form -->
+<div id="loginScreen">
+  <div class="login-card">
+    <h1>Welcome back</h1>
+    <p class="login-subtitle">Enter the gallery password</p>
+
+    <label class="field-label" for="passwordInput">Password</label>
+    <input type="password" id="passwordInput" placeholder="••••••••" autocomplete="current-password" />
+
+    <button class="btn-login" id="loginBtn">Enter gallery</button>
+    <div class="login-error" id="loginError">Wrong password. Try again.</div>
+  </div>
+</div>
+
+<!-- Gallery (shown after login) -->
+<div id="galleryScreen">
+  <div class="stats-bar">
+    <span class="count" id="statsLabel">Loading…</span>
+  </div>
+  <div id="galleryContent">
+    <div class="state-msg"><span class="icon">⏳</span>Loading photos…</div>
+  </div>
+</div>
+
+<!-- Lightbox -->
+<div id="lightbox" role="dialog" aria-modal="true" aria-label="Photo viewer">
+  <button class="lb-close" id="lbClose" aria-label="Close">&#x2715;</button>
+
+  <div id="lbMedia"></div>
+  <p class="lb-caption" id="lbCaption"></p>
+
+  <div class="lb-controls">
+    <button class="lb-btn" id="lbPrev">&#8592; Prev</button>
+    <span class="lb-counter" id="lbCounter"></span>
+    <button class="lb-btn" id="lbNext">Next &#8594;</button>
+  </div>
+
+  <a class="lb-btn lb-download" id="lbDownload" download>&#8595; Save this photo</a>
+</div>
+
+<script>
+  "use strict";
+
+  // ── State ──────────────────────────────────────────────────────────────
+
+  let allPhotos = [];   // flat list: { url, key, filename, guest }
+  let lbIndex   = 0;
+
+  // ── DOM refs ───────────────────────────────────────────────────────────
+
+  const loginScreen   = document.getElementById("loginScreen");
+  const galleryScreen = document.getElementById("galleryScreen");
+  const headerActions = document.getElementById("headerActions");
+  const passwordInput = document.getElementById("passwordInput");
+  const loginBtn      = document.getElementById("loginBtn");
+  const loginError    = document.getElementById("loginError");
+  const galleryContent= document.getElementById("galleryContent");
+  const statsLabel    = document.getElementById("statsLabel");
+  const refreshBtn    = document.getElementById("refreshBtn");
+  const downloadBtn   = document.getElementById("downloadBtn");
+  const logoutBtn     = document.getElementById("logoutBtn");
+  const lightbox      = document.getElementById("lightbox");
+  const lbMedia       = document.getElementById("lbMedia");
+  const lbClose       = document.getElementById("lbClose");
+  const lbPrev        = document.getElementById("lbPrev");
+  const lbNext        = document.getElementById("lbNext");
+  const lbCounter     = document.getElementById("lbCounter");
+  const lbCaption     = document.getElementById("lbCaption");
+  const lbDownload    = document.getElementById("lbDownload");
+
+  // ── Boot: check session ────────────────────────────────────────────────
+  // On page load we ask /api/me — if authenticated we go straight to the gallery,
+  // no password re-entry needed (session cookie is present).
+
+  (async () => {
+    try {
+      const res = await fetch("/api/me");
+      const { authenticated } = await res.json();
+      if (authenticated) {
+        showGallery();
+        loadPhotos();
+      }
+    } catch { /* network error — stay on login screen */ }
+  })();
+
+  // ── Login ──────────────────────────────────────────────────────────────
+
+  loginBtn.addEventListener("click", doLogin);
+  passwordInput.addEventListener("keydown", e => { if (e.key === "Enter") doLogin(); });
+
+  async function doLogin() {
+    const pw = passwordInput.value;
+    if (!pw) return;
+
+    loginBtn.disabled = true;
+    loginBtn.textContent = "Checking…";
+    loginError.style.display = "none";
+
+    try {
+      const res = await fetch("/api/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: pw }),
+      });
+
+      if (res.ok) {
+        passwordInput.value = "";
+        showGallery();
+        loadPhotos();
+      } else {
+        loginError.style.display = "block";
+        loginBtn.disabled = false;
+        loginBtn.textContent = "Enter gallery";
+        passwordInput.focus();
+      }
+    } catch {
+      loginError.textContent = "Network error. Please try again.";
+      loginError.style.display = "block";
+      loginBtn.disabled = false;
+      loginBtn.textContent = "Enter gallery";
+    }
+  }
+
+  function showGallery() {
+    loginScreen.style.display   = "none";
+    galleryScreen.style.display = "block";
+    headerActions.style.display = "flex";
+  }
+
+  // ── Logout ─────────────────────────────────────────────────────────────
+
+  logoutBtn.addEventListener("click", async () => {
+    await fetch("/api/logout", { method: "POST" });
+    galleryScreen.style.display = "none";
+    headerActions.style.display = "none";
+    loginScreen.style.display   = "flex";
+    loginBtn.disabled = false;
+    loginBtn.textContent = "Enter gallery";
+    galleryContent.innerHTML = '<div class="state-msg"><span class="icon">⏳</span>Loading photos…</div>';
+    allPhotos = [];
+  });
+
+  // ── Load photos ─────────────────────────────────────────────────────────
+
+  refreshBtn.addEventListener("click", loadPhotos);
+
+  async function loadPhotos() {
+    galleryContent.innerHTML = '<div class="state-msg"><span class="icon">⏳</span>Loading photos…</div>';
+    statsLabel.textContent = "Loading…";
+    allPhotos = [];
+
+    try {
+      const res = await fetch("/api/photos");
+      if (res.status === 401) {
+        // Session expired
+        galleryScreen.style.display = "none";
+        headerActions.style.display = "none";
+        loginScreen.style.display   = "flex";
+        return;
+      }
+      const groups = await res.json(); // [{guest, photos:[{url,key,filename,uploaded_at}]}]
+
+      allPhotos = [];
+      groups.forEach(g => g.photos.forEach(p => allPhotos.push({ ...p, guest: g.guest })));
+
+      renderGallery(groups);
+
+      const total = allPhotos.length;
+      statsLabel.textContent = `${total} photo${total === 1 ? "" : "s"} from ${groups.length} guest${groups.length === 1 ? "" : "s"}`;
+    } catch (err) {
+      galleryContent.innerHTML = `<div class="state-msg"><span class="icon">⚠️</span>Failed to load photos. <a href="#" onclick="loadPhotos(); return false">Retry</a></div>`;
+      console.error(err);
+    }
+  }
+
+  function renderGallery(groups) {
+    if (!groups.length) {
+      galleryContent.innerHTML = '<div class="state-msg"><span class="icon">📷</span>No photos yet. Guests will start uploading soon!</div>';
+      return;
+    }
+
+    galleryContent.innerHTML = "";
+
+    groups.forEach(({ guest, photos }) => {
+      const section = document.createElement("div");
+      section.className = "guest-section";
+
+      const hdr = document.createElement("div");
+      hdr.className = "guest-header";
+      hdr.innerHTML = `
+        <span class="guest-name">${escHtml(guest.replace(/_/g, " "))}</span>
+        <span class="guest-count">${photos.length} photo${photos.length === 1 ? "" : "s"}</span>
+      `;
+      section.appendChild(hdr);
+
+      const grid = document.createElement("div");
+      grid.className = "photo-grid";
+
+      photos.forEach(photo => {
+        const globalIdx = allPhotos.findIndex(p => p.key === photo.key);
+        const thumb = document.createElement("div");
+        thumb.className = "photo-thumb";
+        thumb.setAttribute("role", "button");
+        thumb.setAttribute("tabindex", "0");
+        thumb.setAttribute("aria-label", `Open ${photo.filename}`);
+
+        if (isVideo(photo.filename)) {
+          const vid = document.createElement("video");
+          vid.src = photo.url;
+          vid.muted = true;
+          vid.playsInline = true;
+          vid.preload = "metadata"; // just enough to show first frame
+          thumb.appendChild(vid);
+
+          const badge = document.createElement("span");
+          badge.className = "video-badge";
+          badge.textContent = "VIDEO";
+          thumb.appendChild(badge);
+        } else {
+          const img = new Image();
+          img.src = photo.url;
+          img.alt = photo.filename;
+          img.loading = "lazy";
+          thumb.appendChild(img);
+        }
+
+        thumb.addEventListener("click",  () => openLightbox(globalIdx));
+        thumb.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") openLightbox(globalIdx); });
+        grid.appendChild(thumb);
+      });
+
+      section.appendChild(grid);
+      galleryContent.appendChild(section);
+    });
+  }
+
+  // ── Download zip ────────────────────────────────────────────────────────
+
+  downloadBtn.addEventListener("click", () => {
+    // The server builds the zip and sends it as a download.
+    // Using an anchor click keeps the browser's native download UI.
+    const a = document.createElement("a");
+    a.href = "/api/download-zip";
+    a.download = "wedding_photos.zip";
+    a.style.display = "none";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+
+    downloadBtn.textContent = "⏳ Preparing…";
+    // Re-enable after a few seconds (the download will start in background)
+    setTimeout(() => { downloadBtn.textContent = "↓ Download all"; }, 5000);
+  });
+
+  // ── Lightbox ────────────────────────────────────────────────────────────
+
+  function openLightbox(index) {
+    lbIndex = index;
+    renderLbMedia();
+    lightbox.classList.add("open");
+    document.body.style.overflow = "hidden";
+  }
+
+  function closeLightbox() {
+    // Pause any playing video
+    const vid = lbMedia.querySelector("video");
+    if (vid) vid.pause();
+    lightbox.classList.remove("open");
+    document.body.style.overflow = "";
+  }
+
+  function renderLbMedia() {
+    lbMedia.innerHTML = "";
+    const photo = allPhotos[lbIndex];
+
+    if (isVideo(photo.filename)) {
+      const vid = document.createElement("video");
+      vid.src = photo.url;
+      vid.controls = true;
+      vid.playsInline = true;
+      vid.autoplay = true;
+      vid.muted = false;
+      lbMedia.appendChild(vid);
+    } else {
+      const img = new Image();
+      img.src = photo.url;
+      img.alt = photo.filename;
+      lbMedia.appendChild(img);
+    }
+
+    lbCounter.textContent = `${lbIndex + 1} / ${allPhotos.length}`;
+    lbCaption.textContent = `${photo.guest.replace(/_/g, " ")} · ${photo.filename}`;
+    lbDownload.href = photo.url;
+    lbDownload.download = photo.filename;
+
+    lbPrev.disabled = lbIndex === 0;
+    lbNext.disabled = lbIndex === allPhotos.length - 1;
+  }
+
+  lbClose.addEventListener("click", closeLightbox);
+  lbPrev.addEventListener("click",  () => { if (lbIndex > 0) { lbIndex--; renderLbMedia(); } });
+  lbNext.addEventListener("click",  () => { if (lbIndex < allPhotos.length - 1) { lbIndex++; renderLbMedia(); } });
+
+  // Click outside media to close
+  lightbox.addEventListener("click", e => { if (e.target === lightbox) closeLightbox(); });
+
+  // Keyboard navigation
+  document.addEventListener("keydown", e => {
+    if (!lightbox.classList.contains("open")) return;
+    if (e.key === "Escape")       closeLightbox();
+    if (e.key === "ArrowLeft"  && lbIndex > 0)                     { lbIndex--; renderLbMedia(); }
+    if (e.key === "ArrowRight" && lbIndex < allPhotos.length - 1)  { lbIndex++; renderLbMedia(); }
+  });
+
+  // ── Helpers ─────────────────────────────────────────────────────────────
+
+  function isVideo(filename) {
+    return /\.(mp4|mov|avi|webm|mkv)$/i.test(filename);
+  }
+
+  function escHtml(str) {
+    return str.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+              .replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+  }
+</script>
+</body>
+</html>
