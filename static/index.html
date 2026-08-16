@@ -3,13 +3,26 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Share Your Wedding Photos</title>
+  <title>Orestis &amp; Athina Wedding</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+    :root {
+      --rose: #c9a9a6;
+      --rose-dark: #b89490;
+      --ink: #4a4442;
+      /* An elegant serif for names/headings; falls back to Georgia if the
+         web font is slow or blocked, so the page always looks intentional. */
+      --serif: "Cormorant Garamond", Georgia, "Times New Roman", serif;
+    }
+
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, sans-serif;
-      background: #faf8f5;
+      background: linear-gradient(160deg, #faf8f5 0%, #f4ece6 100%);
+      background-attachment: fixed;
       color: #333;
       min-height: 100vh;
     }
@@ -27,10 +40,11 @@
       z-index: 10;
     }
     header .brand {
-      font-size: 1.05rem;
-      font-weight: 400;
-      letter-spacing: 0.04em;
-      color: #666;
+      font-family: var(--serif);
+      font-size: 1.4rem;
+      font-weight: 500;
+      letter-spacing: 0.02em;
+      color: var(--ink);
     }
     .login-link {
       font-size: 0.8rem;
@@ -56,18 +70,36 @@
       box-shadow: 0 2px 12px rgba(0,0,0,0.06);
     }
     .card h1 {
-      font-size: 1.55rem;
-      font-weight: 300;
+      font-family: var(--serif);
+      font-size: 2.1rem;
+      font-weight: 600;
       text-align: center;
-      color: #444;
-      margin-bottom: 0.3rem;
+      color: var(--ink);
+      margin-bottom: 0.15rem;
     }
     .subtitle {
       text-align: center;
-      color: #999;
+      color: #a79b94;
       font-size: 0.85rem;
-      margin-bottom: 1.75rem;
+      margin-bottom: 1rem;
     }
+    /* Small decorative divider between the title block and the form */
+    .divider {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.6rem;
+      color: var(--rose);
+      margin-bottom: 1.75rem;
+      font-size: 0.8rem;
+    }
+    .divider::before, .divider::after {
+      content: "";
+      height: 1px;
+      width: 44px;
+      background: linear-gradient(to var(--dir, right), transparent, #e3d3ce);
+    }
+    .divider::before { --dir: left; }
 
     /* ── Form elements ── */
     label {
@@ -189,17 +221,18 @@
 <body>
 
 <header>
-  <span class="brand">The Wedding &#x1F4AB;</span>
+  <span class="brand">Orestis &amp; Athina</span>
   <a href="/gallery" class="login-link">Couple login</a>
 </header>
 
 <main>
   <div class="card">
     <h1>Share your photos</h1>
-    <p class="subtitle">Help us capture every moment ✨</p>
+    <p class="subtitle">Help us capture every moment of our special day</p>
+    <div class="divider">&#10084;</div>
 
     <label for="guestName">Your name</label>
-    <input type="text" id="guestName" placeholder="e.g. Maria Papadopoulos"
+    <input type="text" id="guestName" placeholder="e.g. Andreas Nikolaou"
            autocomplete="name" autocorrect="off" spellcheck="false" />
 
     <label>Photos &amp; videos</label>

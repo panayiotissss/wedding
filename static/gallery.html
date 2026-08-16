@@ -3,13 +3,24 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Gallery — Wedding Photos</title>
+  <title>Gallery — Orestis &amp; Athina</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+    :root {
+      --rose: #c9a9a6;
+      --rose-dark: #b89490;
+      --ink: #4a4442;
+      --serif: "Cormorant Garamond", Georgia, "Times New Roman", serif;
+    }
+
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, sans-serif;
-      background: #faf8f5;
+      background: linear-gradient(160deg, #faf8f5 0%, #f4ece6 100%);
+      background-attachment: fixed;
       color: #333;
       min-height: 100vh;
     }
@@ -26,7 +37,7 @@
       top: 0;
       z-index: 20;
     }
-    header .brand { font-size: 1.05rem; font-weight: 400; letter-spacing: 0.04em; color: #666; }
+    header .brand { font-family: var(--serif); font-size: 1.4rem; font-weight: 500; letter-spacing: 0.02em; color: var(--ink); }
     .header-actions { display: flex; gap: 0.5rem; align-items: center; }
     .btn-sm {
       font-size: 0.8rem;
@@ -73,10 +84,11 @@
       max-width: 360px;
     }
     .login-card h1 {
-      font-size: 1.4rem;
-      font-weight: 300;
+      font-family: var(--serif);
+      font-size: 1.9rem;
+      font-weight: 600;
       text-align: center;
-      color: #444;
+      color: var(--ink);
       margin-bottom: 0.3rem;
     }
     .login-subtitle {
@@ -265,12 +277,18 @@
       position: absolute;
       bottom: 1rem; right: 1rem;
     }
+    .lb-delete {
+      position: absolute;
+      bottom: 1rem; left: 1rem;
+      background: rgba(211,47,47,0.8);
+    }
+    .lb-delete:hover:not(:disabled) { background: rgba(211,47,47,1); }
   </style>
 </head>
 <body>
 
 <header>
-  <span class="brand">Wedding Gallery &#x1F4AB;</span>
+  <span class="brand">Orestis &amp; Athina</span>
   <div class="header-actions" id="headerActions" style="display:none">
     <button class="btn-sm btn-outline" id="refreshBtn" title="Reload photos">&#8635; Refresh</button>
     <button class="btn-sm btn-solid"   id="downloadBtn">&#8595; Download all</button>
@@ -315,6 +333,7 @@
     <button class="lb-btn" id="lbNext">Next &#8594;</button>
   </div>
 
+  <button class="lb-btn lb-delete" id="lbDelete">&#128465; Delete</button>
   <a class="lb-btn lb-download" id="lbDownload" download>&#8595; Save this photo</a>
 </div>
 
@@ -347,6 +366,7 @@
   const lbCounter     = document.getElementById("lbCounter");
   const lbCaption     = document.getElementById("lbCaption");
   const lbDownload    = document.getElementById("lbDownload");
+  const lbDelete      = document.getElementById("lbDelete");
 
   // ── Boot: check session ────────────────────────────────────────────────
   // On page load we ask /api/me — if authenticated we go straight to the gallery,
@@ -580,6 +600,60 @@
   lbClose.addEventListener("click", closeLightbox);
   lbPrev.addEventListener("click",  () => { if (lbIndex > 0) { lbIndex--; renderLbMedia(); } });
   lbNext.addEventListener("click",  () => { if (lbIndex < allPhotos.length - 1) { lbIndex++; renderLbMedia(); } });
+  lbDelete.addEventListener("click", deleteCurrent);
+
+  // ── Delete (couple only — this whole page is behind login) ────────────────
+
+  async function deleteCurrent() {
+    const photo = allPhotos[lbIndex];
+    if (!photo) return;
+
+    const who = photo.guest.replace(/_/g, " ");
+    if (!confirm(`Delete this photo from ${who}?\n\nThis permanently removes it and cannot be undone.`)) return;
+
+    lbDelete.disabled = true;
+    lbDelete.textContent = "Deleting…";
+
+    try {
+      const res = await fetch("/api/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key: photo.key }),
+      });
+      if (!res.ok) throw new Error(`Server error ${res.status}`);
+
+      // Drop it from local state, then refresh the grid + stats without a reload.
+      allPhotos.splice(lbIndex, 1);
+
+      if (allPhotos.length === 0) {
+        closeLightbox();
+        renderGallery([]);
+        statsLabel.textContent = "0 photos";
+      } else {
+        if (lbIndex >= allPhotos.length) lbIndex = allPhotos.length - 1;
+        renderLbMedia();
+        rebuildGalleryFromState();
+      }
+    } catch (err) {
+      alert("Could not delete the photo. Please try again.");
+      console.error(err);
+    } finally {
+      lbDelete.disabled = false;
+      lbDelete.innerHTML = "&#128465; Delete";
+    }
+  }
+
+  // Rebuild the guest sections from the in-memory photo list (post-delete),
+  // so we don't have to round-trip to the server just to redraw.
+  function rebuildGalleryFromState() {
+    const byGuest = {};
+    allPhotos.forEach(p => { (byGuest[p.guest] = byGuest[p.guest] || []).push(p); });
+    const groups = Object.keys(byGuest).map(guest => ({ guest, photos: byGuest[guest] }));
+    renderGallery(groups);
+    const total = allPhotos.length;
+    statsLabel.textContent =
+      `${total} photo${total === 1 ? "" : "s"} from ${groups.length} guest${groups.length === 1 ? "" : "s"}`;
+  }
 
   // Click outside media to close
   lightbox.addEventListener("click", e => { if (e.target === lightbox) closeLightbox(); });

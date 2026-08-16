@@ -6,8 +6,6 @@ Two roles:
   - Couple   → POST /api/login, GET /api/photos, GET /api/download-zip (session-gated)
 """
 
-import asyncio
-import io
 import os
 import re
 import uuid
@@ -18,7 +16,7 @@ import boto3
 from botocore.config import Config
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, field_validator
 from starlette.middleware.sessions import SessionMiddleware
@@ -42,6 +40,10 @@ R2_BUCKET           = _require("R2_BUCKET")
 R2_ENDPOINT         = _require("R2_ENDPOINT")
 GALLERY_PASSWORD    = _require("GALLERY_PASSWORD")
 SESSION_SECRET      = _require("SESSION_SECRET")
+
+# Cookie is HTTPS-only by default (correct for Render, which serves HTTPS).
+# Set COOKIE_SECURE=false only for local http://localhost testing.
+COOKIE_SECURE = os.environ.get("COOKIE_SECURE", "true").lower() != "false"
 
 MAX_FILE_SIZE = 200 * 1024 * 1024  # 200 MB — generous for videos
 
@@ -85,7 +87,7 @@ app.add_middleware(
     secret_key=SESSION_SECRET,
     session_cookie="wed_session",
     max_age=60 * 60 * 24 * 7,  # 7 days
-    https_only=False,           # set True when behind HTTPS in production
+    https_only=COOKIE_SECURE,   # True in production (HTTPS on Render)
     same_site="lax",
 )
 
@@ -272,48 +274,101 @@ def list_photos(_: None = Depends(require_auth)):
 # ---------------------------------------------------------------------------
 
 @app.get("/api/download-zip")
-async def download_zip(_: None = Depends(require_auth)):
+def download_zip(_: None = Depends(require_auth)):
     """
-    Pull every object from R2, pack into a zip, stream to the browser.
+    Stream every object from R2 into a zip, on the fly.
 
-    Why on the server?
-    The bucket is private so the browser can't access objects directly without
-    presigned URLs.  Building the zip here is the cleanest single-endpoint
-    download for the couple.
+    Instead of building the whole zip in RAM first, we read each photo from R2
+    in 1 MB chunks and write it straight into the zip stream, so the server only
+    holds a chunk at a time.  This is safe even for a multi-GB wedding on a small
+    (512 MB) instance.
 
-    Trade-off: the server loads all photos into RAM while building the zip.
-    For a wedding (a few hundred photos) this is fine.  A 500-photo wedding
-    at 5 MB/photo = 2.5 GB — make sure your server has enough memory, or
-    upgrade to a streaming zip library if needed.
+    zipfile detects that our output sink isn't seekable and automatically writes
+    per-file data descriptors, so it never needs to seek back to patch headers.
+    Starlette runs this sync generator in a threadpool, so the blocking boto3
+    calls don't stall the event loop.
     """
-    def build_zip() -> bytes:
+    class _ChunkSink:
+        """Minimal write-only, non-seekable sink that zipfile writes into.
+
+        We drain the accumulated bytes after each write and yield them to the
+        client, keeping memory bounded to roughly one chunk.
+        """
+        def __init__(self):
+            self._parts: list[bytes] = []
+
+        def write(self, data: bytes) -> int:
+            self._parts.append(data)
+            return len(data)
+
+        def flush(self) -> None:
+            pass
+
+        def drain(self) -> bytes:
+            data = b"".join(self._parts)
+            self._parts.clear()
+            return data
+
+    def generate():
         paginator = s3.get_paginator("list_objects_v2")
         objects: list[dict] = []
         for page in paginator.paginate(Bucket=R2_BUCKET, Prefix="photos/"):
             objects.extend(page.get("Contents", []))
 
-        buf = io.BytesIO()
+        sink = _ChunkSink()
         # ZIP_STORED skips re-compression — images/videos are already compressed.
-        with zipfile.ZipFile(buf, "w", zipfile.ZIP_STORED) as zf:
+        with zipfile.ZipFile(sink, "w", zipfile.ZIP_STORED) as zf:
             for obj in objects:
                 key = obj["Key"]
                 parts = key.split("/")
                 guest = parts[1] if len(parts) > 2 else "unknown"
                 filename = parts[-1]
-                body = s3.get_object(Bucket=R2_BUCKET, Key=key)["Body"].read()
-                zf.writestr(f"{guest}/{filename}", body)
 
-        buf.seek(0)
-        return buf.read()
+                zinfo = zipfile.ZipInfo(f"{guest}/{filename}")
+                zinfo.compress_type = zipfile.ZIP_STORED
+                with zf.open(zinfo, mode="w") as dest:
+                    body = s3.get_object(Bucket=R2_BUCKET, Key=key)["Body"]
+                    for chunk in body.iter_chunks(chunk_size=1024 * 1024):
+                        dest.write(chunk)
+                        out = sink.drain()
+                        if out:
+                            yield out
+                out = sink.drain()
+                if out:
+                    yield out
+        # close() flushed the central directory into the sink — send the tail.
+        tail = sink.drain()
+        if tail:
+            yield tail
 
-    # Run the blocking boto3 calls in a thread so FastAPI stays responsive
-    data = await asyncio.to_thread(build_zip)
-
-    return Response(
-        content=data,
+    return StreamingResponse(
+        generate(),
         media_type="application/zip",
         headers={"Content-Disposition": 'attachment; filename="wedding_photos.zip"'},
     )
+
+
+# ---------------------------------------------------------------------------
+# API — delete a photo  (PROTECTED)
+# ---------------------------------------------------------------------------
+
+class DeleteRequest(BaseModel):
+    key: str
+
+
+@app.post("/api/delete")
+def delete_photo(body: DeleteRequest, _: None = Depends(require_auth)):
+    """
+    Delete one object from R2 by key.
+
+    Only the couple (authenticated) can call this.  We refuse any key outside
+    the `photos/` prefix so a crafted request can't touch anything else in the
+    bucket.
+    """
+    if not body.key.startswith("photos/") or ".." in body.key:
+        raise HTTPException(status_code=400, detail="Invalid key")
+    s3.delete_object(Bucket=R2_BUCKET, Key=body.key)
+    return {"ok": True}
 
 
 # ---------------------------------------------------------------------------

@@ -44,7 +44,7 @@ def make_qr(url: str, output: str = "wedding_qr.png") -> None:
     except OSError:
         font = ImageFont.load_default()
 
-    lines = ["Scan to share your photos!", url]
+    lines = ["Orestis & Athina Wedding"]
     y = h + 6
     for line in lines:
         bbox = draw.textbbox((0, 0), line, font=font)
@@ -53,7 +53,7 @@ def make_qr(url: str, output: str = "wedding_qr.png") -> None:
         y += 22
 
     final.save(output)
-    print(f"✓ QR code saved to: {Path(output).resolve()}")
+    print(f"[OK] QR code saved to: {Path(output).resolve()}")
     print(f"  URL: {url}")
     print("  Print it and display it at the wedding table!")
 
