@@ -45,7 +45,7 @@ SESSION_SECRET      = _require("SESSION_SECRET")
 # Set COOKIE_SECURE=false only for local http://localhost testing.
 COOKIE_SECURE = os.environ.get("COOKIE_SECURE", "true").lower() != "false"
 
-MAX_FILE_SIZE = 200 * 1024 * 1024  # 200 MB — generous for videos
+MAX_FILE_SIZE = 500 * 1024 * 1024  # 500 MB — generous for large videos
 
 # These are the only content-types we'll presign for.
 # R2 enforces the type matches because ContentType is baked into the presigned URL.
@@ -369,6 +369,41 @@ def delete_photo(body: DeleteRequest, _: None = Depends(require_auth)):
         raise HTTPException(status_code=400, detail="Invalid key")
     s3.delete_object(Bucket=R2_BUCKET, Key=body.key)
     return {"ok": True}
+
+
+# ---------------------------------------------------------------------------
+# API — delete ALL photos  (PROTECTED)
+# ---------------------------------------------------------------------------
+
+@app.post("/api/delete-all")
+def delete_all_photos(_: None = Depends(require_auth)):
+    """
+    Delete every object under the `photos/` prefix.
+
+    Used to wipe the gallery clean between weddings once the previous couple has
+    already downloaded their photos.  Only the couple (authenticated) can call
+    this.  We scope strictly to `photos/` so nothing else in the bucket is ever
+    touched, and delete in batches of 1000 (the S3/R2 API limit per call).
+    """
+    paginator = s3.get_paginator("list_objects_v2")
+    deleted = 0
+    batch: list[dict] = []
+
+    def _flush(items: list[dict]) -> int:
+        if not items:
+            return 0
+        s3.delete_objects(Bucket=R2_BUCKET, Delete={"Objects": items, "Quiet": True})
+        return len(items)
+
+    for page in paginator.paginate(Bucket=R2_BUCKET, Prefix="photos/"):
+        for obj in page.get("Contents", []):
+            batch.append({"Key": obj["Key"]})
+            if len(batch) == 1000:  # R2/S3 caps delete_objects at 1000 keys
+                deleted += _flush(batch)
+                batch = []
+    deleted += _flush(batch)
+
+    return {"ok": True, "deleted": deleted}
 
 
 # ---------------------------------------------------------------------------

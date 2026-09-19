@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Gallery — Orestis &amp; Athina</title>
+  <title>Gallery — Andreas &amp; Haris</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&display=swap" rel="stylesheet" />
@@ -288,10 +288,11 @@
 <body>
 
 <header>
-  <span class="brand">Orestis &amp; Athina</span>
+  <span class="brand">Andreas &amp; Haris</span>
   <div class="header-actions" id="headerActions" style="display:none">
     <button class="btn-sm btn-outline" id="refreshBtn" title="Reload photos">&#8635; Refresh</button>
     <button class="btn-sm btn-solid"   id="downloadBtn">&#8595; Download all</button>
+    <button class="btn-sm btn-danger"  id="deleteAllBtn" title="Delete every photo">&#128465; Delete all</button>
     <button class="btn-sm btn-danger"  id="logoutBtn">Logout</button>
   </div>
 </header>
@@ -357,6 +358,7 @@
   const statsLabel    = document.getElementById("statsLabel");
   const refreshBtn    = document.getElementById("refreshBtn");
   const downloadBtn   = document.getElementById("downloadBtn");
+  const deleteAllBtn  = document.getElementById("deleteAllBtn");
   const logoutBtn     = document.getElementById("logoutBtn");
   const lightbox      = document.getElementById("lightbox");
   const lbMedia       = document.getElementById("lbMedia");
@@ -550,6 +552,50 @@
     downloadBtn.textContent = "⏳ Preparing…";
     // Re-enable after a few seconds (the download will start in background)
     setTimeout(() => { downloadBtn.textContent = "↓ Download all"; }, 5000);
+  });
+
+  // ── Delete all photos ─────────────────────────────────────────────────────
+  // Wipes the whole gallery — used to clear the previous couple's photos once
+  // they've downloaded them.  Double-confirmed because it can't be undone.
+
+  deleteAllBtn.addEventListener("click", async () => {
+    const total = allPhotos.length;
+    if (total === 0) {
+      alert("There are no photos to delete.");
+      return;
+    }
+
+    if (!confirm(`Delete ALL ${total} photo${total === 1 ? "" : "s"}?\n\nThis permanently removes every photo and video in the gallery and cannot be undone.`)) return;
+    // Second guard so an accidental click can't wipe everything.
+    if (!confirm("Are you absolutely sure? This is your last chance to cancel.")) return;
+
+    deleteAllBtn.disabled = true;
+    const original = deleteAllBtn.innerHTML;
+    deleteAllBtn.textContent = "Deleting…";
+
+    try {
+      const res = await fetch("/api/delete-all", { method: "POST" });
+      if (res.status === 401) {
+        galleryScreen.style.display = "none";
+        headerActions.style.display = "none";
+        loginScreen.style.display   = "flex";
+        return;
+      }
+      if (!res.ok) throw new Error(`Server error ${res.status}`);
+
+      const data = await res.json().catch(() => ({}));
+      allPhotos = [];
+      closeLightbox();
+      renderGallery([]);
+      statsLabel.textContent = "0 photos";
+      alert(`Deleted ${data.deleted ?? total} item${(data.deleted ?? total) === 1 ? "" : "s"}. The gallery is now empty.`);
+    } catch (err) {
+      alert("Could not delete all photos. Please try again.");
+      console.error(err);
+    } finally {
+      deleteAllBtn.disabled = false;
+      deleteAllBtn.innerHTML = original;
+    }
   });
 
   // ── Lightbox ────────────────────────────────────────────────────────────

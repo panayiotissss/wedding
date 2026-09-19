@@ -44,7 +44,7 @@ def make_qr(url: str, output: str = "wedding_qr.png") -> None:
     except OSError:
         font = ImageFont.load_default()
 
-    lines = ["Orestis & Athina Wedding"]
+    lines = []
     y = h + 6
     for line in lines:
         bbox = draw.textbbox((0, 0), line, font=font)

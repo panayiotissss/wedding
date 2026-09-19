@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Orestis &amp; Athina Wedding</title>
+  <title>Andreas &amp; Haris Wedding</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&display=swap" rel="stylesheet" />
@@ -186,6 +186,43 @@
     .badge-done     { background: rgba(76,175,80,0.85);  color: #fff; }
     .badge-error    { background: rgba(211,47,47,0.85);  color: #fff; }
 
+    /* Per-item progress fill — a thin bar along the bottom of each thumbnail
+       that grows left→right as that file uploads. */
+    .preview-progress {
+      position: absolute;
+      bottom: 0; left: 0;
+      height: 3px;
+      width: 0%;
+      background: #7fbf82;
+      transition: width 0.15s ease-out;
+    }
+
+    /* ── Overall progress bar (all files combined) ── */
+    .overall-progress {
+      display: none;
+      margin-bottom: 1rem;
+    }
+    .overall-progress .op-label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.78rem;
+      color: #888;
+      margin-bottom: 0.35rem;
+    }
+    .overall-progress .op-track {
+      height: 8px;
+      background: #ede8e1;
+      border-radius: 6px;
+      overflow: hidden;
+    }
+    .overall-progress .op-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #c9a9a6, #b89490);
+      border-radius: 6px;
+      transition: width 0.2s ease-out;
+    }
+
     /* ── Upload button ── */
     .btn-upload {
       display: block;
@@ -221,7 +258,7 @@
 <body>
 
 <header>
-  <span class="brand">Orestis &amp; Athina</span>
+  <span class="brand">Andreas &amp; Haris</span>
   <a href="/gallery" class="login-link">Couple login</a>
 </header>
 
@@ -232,7 +269,7 @@
     <div class="divider">&#10084;</div>
 
     <label for="guestName">Your name</label>
-    <input type="text" id="guestName" placeholder="e.g. Andreas Nikolaou"
+    <input type="text" id="guestName" placeholder="e.g. Maria Georgiou"
            autocomplete="name" autocorrect="off" spellcheck="false" />
 
     <label>Photos &amp; videos</label>
@@ -245,10 +282,18 @@
       <input type="file" id="fileInput" multiple accept="image/*,video/*" />
       <div class="dz-icon">&#128247;</div>
       <p class="dz-primary">Tap to choose or drag &amp; drop</p>
-      <p class="dz-secondary">Photos &amp; videos · up to 200 MB each</p>
+      <p class="dz-secondary">Photos &amp; videos · up to 500 MB each</p>
     </div>
 
     <div class="preview-grid" id="previewGrid" style="display:none"></div>
+
+    <div class="overall-progress" id="overallProgress">
+      <div class="op-label">
+        <span id="opText">Uploading…</span>
+        <span id="opPercent">0%</span>
+      </div>
+      <div class="op-track"><div class="op-fill" id="opFill"></div></div>
+    </div>
 
     <button class="btn-upload" id="uploadBtn" disabled>Choose photos first</button>
 
@@ -259,7 +304,8 @@
 <script>
   "use strict";
 
-  const MAX_SIZE = 200 * 1024 * 1024;
+  const MAX_SIZE = 500 * 1024 * 1024;
+  const MAX_PARALLEL = 3;  // how many files upload at once
   const ALLOWED = new Set([
     "image/jpeg","image/png","image/gif","image/webp",
     "image/heic","image/heif",
@@ -272,6 +318,10 @@
   const previewGrid = document.getElementById("previewGrid");
   const uploadBtn   = document.getElementById("uploadBtn");
   const toast       = document.getElementById("toast");
+  const overallProgress = document.getElementById("overallProgress");
+  const opFill      = document.getElementById("opFill");
+  const opText      = document.getElementById("opText");
+  const opPercent   = document.getElementById("opPercent");
 
   let selectedFiles = [];
 
@@ -325,6 +375,10 @@
       badge.textContent = truncate(file.name, 14);
       item.appendChild(badge);
 
+      const bar = document.createElement("div");
+      bar.className = "preview-progress";
+      item.appendChild(bar);
+
       previewGrid.appendChild(item);
     });
 
@@ -335,6 +389,11 @@
   }
 
   // ── Upload ──────────────────────────────────────────────────────────────
+
+  // Tracks bytes uploaded per file so we can compute an overall percentage
+  // even while several files upload at the same time.
+  let loadedBytes = [];
+  let totalBytes  = 0;
 
   uploadBtn.addEventListener("click", async () => {
     const name = nameInput.value.trim();
@@ -348,7 +407,7 @@
     const bad = selectedFiles.filter(f => !ALLOWED.has(f.type) || f.size > MAX_SIZE);
     if (bad.length) {
       showToast(
-        `${bad.length} file${bad.length > 1 ? "s" : ""} skipped: unsupported type or over 200 MB.`,
+        `${bad.length} file${bad.length > 1 ? "s" : ""} skipped: unsupported type or over 500 MB.`,
         "error"
       );
       selectedFiles = selectedFiles.filter(f => ALLOWED.has(f.type) && f.size <= MAX_SIZE);
@@ -359,52 +418,34 @@
     uploadBtn.textContent = "Uploading…";
     hideToast();
 
+    // Reset progress accounting for this run.
+    loadedBytes = selectedFiles.map(() => 0);
+    totalBytes  = selectedFiles.reduce((sum, f) => sum + f.size, 0);
+    showOverall(true);
+    updateOverall();
+
     let ok = 0, fail = 0;
 
-    for (let i = 0; i < selectedFiles.length; i++) {
-      const file = selectedFiles[i];
-      setBadge(i, "uploading", "Uploading…");
-
-      try {
-        // Step 1 — ask our server for a presigned PUT URL.
-        // The server validates type + size and returns a time-limited URL.
-        const res = await fetch("/api/upload-url", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            filename:     file.name,
-            content_type: file.type,
-            guest_name:   name,
-            file_size:    file.size,
-          }),
-        });
-
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
-          throw new Error(err.detail || `Server error ${res.status}`);
-        }
-
-        const { url } = await res.json();
-
-        // Step 2 — PUT the file DIRECTLY to R2.
-        // Our server is NOT in the data path; R2 receives the bytes.
-        const put = await fetch(url, {
-          method: "PUT",
-          headers: { "Content-Type": file.type },
-          body: file,
-        });
-
-        if (!put.ok) throw new Error(`R2 rejected upload: ${put.status}`);
-
-        setBadge(i, "done", "✓ Done");
-        ok++;
-      } catch (err) {
-        setBadge(i, "error", "✗ Failed");
-        console.error("Upload error for", file.name, err);
-        fail++;
+    // Parallel worker pool: several files upload concurrently (faster on the
+    // fast up-links guests usually have), but we cap how many run at once so a
+    // phone on mobile data isn't overwhelmed.  Each worker pulls the next index
+    // off a shared counter until the queue is drained.
+    let next = 0;
+    async function worker() {
+      while (next < selectedFiles.length) {
+        const i = next++;
+        const result = await uploadOne(i, name);
+        if (result) ok++; else fail++;
       }
     }
 
+    const workers = [];
+    for (let w = 0; w < Math.min(MAX_PARALLEL, selectedFiles.length); w++) {
+      workers.push(worker());
+    }
+    await Promise.all(workers);
+
+    showOverall(false);
     uploadBtn.textContent = "Upload more";
     uploadBtn.disabled = false;
 
@@ -416,6 +457,98 @@
       showToast(`${ok} uploaded, ${fail} failed. You can retry the failed ones.`, "info");
     }
   });
+
+  // Upload a single file: get a presigned URL, then PUT it to R2 with an XHR so
+  // we get real upload-progress events (fetch() gives no upload progress).
+  // Returns true on success, false on failure.
+  async function uploadOne(i, name) {
+    const file = selectedFiles[i];
+    setBadge(i, "uploading", "0%");
+
+    try {
+      // Step 1 — ask our server for a presigned PUT URL.
+      const res = await fetch("/api/upload-url", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          filename:     file.name,
+          content_type: file.type,
+          guest_name:   name,
+          file_size:    file.size,
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || `Server error ${res.status}`);
+      }
+
+      const { url } = await res.json();
+
+      // Step 2 — PUT the file DIRECTLY to R2 via XHR (progress-aware).
+      // Our server is NOT in the data path; R2 receives the bytes.
+      await new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open("PUT", url);
+        xhr.setRequestHeader("Content-Type", file.type);
+
+        xhr.upload.onprogress = e => {
+          if (!e.lengthComputable) return;
+          loadedBytes[i] = e.loaded;
+          const pct = Math.round((e.loaded / e.total) * 100);
+          setItemProgress(i, pct);
+          setBadge(i, "uploading", pct + "%");
+          updateOverall();
+        };
+
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) resolve();
+          else reject(new Error(`R2 rejected upload: ${xhr.status}`));
+        };
+        xhr.onerror = () => reject(new Error("Network error during upload"));
+        xhr.onabort = () => reject(new Error("Upload aborted"));
+
+        xhr.send(file);
+      });
+
+      // Count the full size in case the last progress event undershot.
+      loadedBytes[i] = file.size;
+      updateOverall();
+      setItemProgress(i, 100);
+      setBadge(i, "done", "✓ Done");
+      return true;
+    } catch (err) {
+      loadedBytes[i] = 0;
+      updateOverall();
+      setBadge(i, "error", "✗ Failed");
+      console.error("Upload error for", file.name, err);
+      return false;
+    }
+  }
+
+  function updateOverall() {
+    if (!totalBytes) return;
+    const loaded = loadedBytes.reduce((a, b) => a + b, 0);
+    const pct = Math.min(100, Math.round((loaded / totalBytes) * 100));
+    opFill.style.width = pct + "%";
+    opPercent.textContent = pct + "%";
+  }
+
+  function showOverall(show) {
+    overallProgress.style.display = show ? "block" : "none";
+    if (show) {
+      opFill.style.width = "0%";
+      opPercent.textContent = "0%";
+      opText.textContent = "Uploading…";
+    }
+  }
+
+  function setItemProgress(index, pct) {
+    const item = document.getElementById(`pi-${index}`);
+    if (!item) return;
+    const bar = item.querySelector(".preview-progress");
+    if (bar) bar.style.width = pct + "%";
+  }
 
   // ── Utilities ────────────────────────────────────────────────────────────
 
