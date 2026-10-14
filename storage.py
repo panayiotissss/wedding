@@ -129,6 +129,17 @@ def delete_key(key: str) -> None:
     s3.delete_object(Bucket=config.R2_BUCKET, Key=key)
 
 
+def delete_prefix(prefix: str) -> int:
+    """Delete every object under `prefix`, 1000 keys per call (the S3/R2 cap)."""
+    deleted = 0
+    keys = [{"Key": o["Key"]} for o in list_prefix(prefix)]
+    for i in range(0, len(keys), 1000):
+        batch = keys[i : i + 1000]
+        s3.delete_objects(Bucket=config.R2_BUCKET, Delete={"Objects": batch, "Quiet": True})
+        deleted += len(batch)
+    return deleted
+
+
 def get_body(key: str):
     """Return the streaming Body for one object (used by the zip stream)."""
     return s3.get_object(Bucket=config.R2_BUCKET, Key=key)["Body"]

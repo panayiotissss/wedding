@@ -178,6 +178,39 @@
     .badge-done     { background: rgba(76,175,80,0.85);  color: #fff; }
     .badge-error    { background: rgba(211,47,47,0.85);  color: #fff; }
 
+    /* Thin per-file bar along the bottom of each thumbnail. */
+    .preview-progress {
+      position: absolute;
+      bottom: 0; left: 0;
+      height: 3px;
+      width: 0%;
+      background: #7fbf82;
+      transition: width 0.15s ease-out;
+    }
+
+    /* Overall progress across all files. */
+    .overall-progress { display: none; margin-bottom: 1rem; }
+    .overall-progress .op-label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.78rem;
+      color: #888;
+      margin-bottom: 0.35rem;
+    }
+    .overall-progress .op-track {
+      height: 8px;
+      background: #ede8e1;
+      border-radius: 6px;
+      overflow: hidden;
+    }
+    .overall-progress .op-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #c9a9a6, #b89490);
+      border-radius: 6px;
+      transition: width 0.2s ease-out;
+    }
+
     .btn-upload {
       display: block;
       width: 100%;
@@ -239,6 +272,14 @@
 
     <div class="preview-grid" id="previewGrid" style="display:none"></div>
 
+    <div class="overall-progress" id="overallProgress">
+      <div class="op-label">
+        <span>Uploading…</span>
+        <span id="opPercent">0%</span>
+      </div>
+      <div class="op-track"><div class="op-fill" id="opFill"></div></div>
+    </div>
+
     <button class="btn-upload" id="uploadBtn" disabled>Choose photos first</button>
 
     <div class="toast" id="toast"></div>
@@ -276,6 +317,9 @@
   const previewGrid = document.getElementById("previewGrid");
   const uploadBtn   = document.getElementById("uploadBtn");
   const toast       = document.getElementById("toast");
+  const overallProgress = document.getElementById("overallProgress");
+  const opFill      = document.getElementById("opFill");
+  const opPercent   = document.getElementById("opPercent");
 
   let selectedFiles = [];
 
@@ -359,6 +403,10 @@
       badge.textContent = truncate(file.name, 14);
       item.appendChild(badge);
 
+      const bar = document.createElement("div");
+      bar.className = "preview-progress";
+      item.appendChild(bar);
+
       previewGrid.appendChild(item);
     });
 
@@ -375,6 +423,10 @@
 
   const CONCURRENCY = 3;
 
+  // Bytes sent per file, so the overall bar is right while files run in parallel.
+  let loadedBytes = [];
+  let totalBytes  = 0;
+
   uploadBtn.addEventListener("click", async () => {
     const name = nameInput.value.trim();
     if (!name) {
@@ -386,7 +438,7 @@
     const bad = selectedFiles.filter(f => !ALLOWED.has(f.type) || f.size > MAX_SIZE);
     if (bad.length) {
       showToast(
-        `${bad.length} file${bad.length > 1 ? "s" : ""} skipped: unsupported type or over 200 MB.`,
+        `${bad.length} file${bad.length > 1 ? "s" : ""} skipped: unsupported type or over 500 MB.`,
         "error"
       );
       selectedFiles = selectedFiles.filter(f => ALLOWED.has(f.type) && f.size <= MAX_SIZE);
@@ -396,6 +448,10 @@
     uploadBtn.disabled = true;
     uploadBtn.textContent = "Uploading…";
     hideToast();
+
+    loadedBytes = selectedFiles.map(() => 0);
+    totalBytes  = selectedFiles.reduce((sum, f) => sum + f.size, 0);
+    showOverall(true);
 
     let ok = 0, fail = 0, cursor = 0;
 
@@ -409,6 +465,8 @@
         } catch (err) {
           console.error("Upload error for", selectedFiles[i] && selectedFiles[i].name, err);
           setBadge(i, "error", "✗ Failed");
+          loadedBytes[i] = 0;
+          updateOverall();
           fail++;
         }
       }
@@ -417,6 +475,7 @@
     const pool = Array.from({ length: Math.min(CONCURRENCY, selectedFiles.length) }, worker);
     await Promise.all(pool);
 
+    showOverall(false);
     uploadBtn.textContent = "Upload more";
     uploadBtn.disabled = false;
 
@@ -450,7 +509,15 @@
     const { url } = await res.json();
 
     // Step 2 — PUT straight to R2, with progress (XHR exposes upload progress; fetch doesn't).
-    await putWithProgress(url, file, pct => setBadge(i, "uploading", pct + "%"));
+    await putWithProgress(url, file, (pct, loaded) => {
+      loadedBytes[i] = loaded;
+      setItemProgress(i, pct);
+      setBadge(i, "uploading", pct + "%");
+      updateOverall();
+    });
+    loadedBytes[i] = file.size;   // in case the last progress event undershot
+    updateOverall();
+    setItemProgress(i, 100);
     setBadge(i, "done", "✓ Done");
   }
 
@@ -460,7 +527,7 @@
       xhr.open("PUT", url);
       xhr.setRequestHeader("Content-Type", file.type);
       xhr.upload.onprogress = e => {
-        if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100));
+        if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100), e.loaded);
       };
       xhr.onload = () =>
         (xhr.status >= 200 && xhr.status < 300)
@@ -469,6 +536,24 @@
       xhr.onerror = () => reject(new Error("network error"));
       xhr.send(file);
     });
+  }
+
+  function updateOverall() {
+    if (!totalBytes) return;
+    const loaded = loadedBytes.reduce((a, b) => a + b, 0);
+    const pct = Math.min(100, Math.round((loaded / totalBytes) * 100));
+    opFill.style.width = pct + "%";
+    opPercent.textContent = pct + "%";
+  }
+
+  function showOverall(show) {
+    overallProgress.style.display = show ? "block" : "none";
+    if (show) { opFill.style.width = "0%"; opPercent.textContent = "0%"; }
+  }
+
+  function setItemProgress(index, pct) {
+    const bar = document.querySelector(`#pi-${index} .preview-progress`);
+    if (bar) bar.style.width = pct + "%";
   }
 
   // ── Utilities ────────────────────────────────────────────────────────────

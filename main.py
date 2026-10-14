@@ -503,6 +503,18 @@ def delete_photo(slug: str, body: DeleteRequest, request: Request, db: Session =
     return {"ok": True}
 
 
+@app.post("/api/e/{slug}/delete-all")
+def delete_all_photos(slug: str, request: Request, db: Session = Depends(get_db)):
+    """Wipe this event's photos (and its cached zip). Scoped to this event's
+    prefixes only, so no other couple's files can be touched."""
+    ev = get_event_or_404(db, slug)
+    require_event_auth(request, slug)
+    key = _storage_key(ev)
+    deleted = storage.delete_prefix(storage.photos_prefix(key))
+    storage.delete_prefix(storage.exports_prefix(key))
+    return {"ok": True, "deleted": deleted}
+
+
 # ---------------------------------------------------------------------------
 # Admin — auto-delete expired events (WED-6)
 # ---------------------------------------------------------------------------
