@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Gallery — Orestis &amp; Athina</title>
+  <title>Gallery</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&display=swap" rel="stylesheet" />
@@ -149,6 +149,29 @@
     /* ── Gallery screen ── */
     #galleryScreen { display: none; padding: 1.5rem 1.25rem 3rem; }
 
+    /* Share-with-guests panel */
+    .share-panel {
+      display: flex; align-items: center; gap: 1rem;
+      background: #fff; border: 1px solid #ede8e1; border-radius: 12px;
+      padding: 1rem 1.25rem; margin-bottom: 1.5rem;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.04);
+    }
+    .share-panel .share-body { flex: 1; min-width: 0; }
+    .share-label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; color: #a79b94; margin-bottom: 0.4rem; }
+    .share-link {
+      display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;
+      font-size: 0.85rem; color: #6a615c; word-break: break-all;
+    }
+    .share-link code { background: #fdfcfb; border: 1px solid #eee; border-radius: 6px; padding: 0.3rem 0.5rem; }
+    .share-actions { display: flex; gap: 0.5rem; margin-top: 0.6rem; flex-wrap: wrap; }
+    .share-actions button, .share-actions a {
+      font-size: 0.78rem; padding: 0.3rem 0.7rem; border-radius: 16px; cursor: pointer;
+      border: 1px solid #c9a9a6; color: #c9a9a6; background: transparent; text-decoration: none;
+    }
+    .share-actions button:hover, .share-actions a:hover { background: #fdf0ef; }
+    .share-qr { width: 96px; height: 96px; border-radius: 8px; border: 1px solid #ede8e1; flex-shrink: 0; }
+    @media (max-width: 480px) { .share-panel { flex-direction: column-reverse; align-items: stretch; } .share-qr { align-self: center; } }
+
     .stats-bar {
       display: flex;
       align-items: center;
@@ -288,7 +311,7 @@
 <body>
 
 <header>
-  <span class="brand">Orestis &amp; Athina</span>
+  <span class="brand" id="brand">Gallery</span>
   <div class="header-actions" id="headerActions" style="display:none">
     <button class="btn-sm btn-outline" id="refreshBtn" title="Reload photos">&#8635; Refresh</button>
     <button class="btn-sm btn-solid"   id="downloadBtn">&#8595; Download all</button>
@@ -312,6 +335,18 @@
 
 <!-- Gallery (shown after login) -->
 <div id="galleryScreen">
+  <div class="share-panel">
+    <div class="share-body">
+      <div class="share-label">Guest upload link — print the QR or share the link</div>
+      <div class="share-link"><code id="guestLink"></code></div>
+      <div class="share-actions">
+        <button id="copyLink" type="button">Copy link</button>
+        <a id="downloadQr" download="wedding_qr.png">↓ Download QR</a>
+      </div>
+    </div>
+    <img class="share-qr" id="galleryQr" alt="Guest upload QR code" />
+  </div>
+
   <div class="stats-bar">
     <span class="count" id="statsLabel">Loading…</span>
   </div>
@@ -340,10 +375,44 @@
 <script>
   "use strict";
 
+  // ── Multi-tenant: derive this event's slug from the URL (/e/<slug>/gallery)
+  const SLUG = location.pathname.split("/")[2] || "";
+  const API  = `/api/e/${SLUG}`;
+
   // ── State ──────────────────────────────────────────────────────────────
 
   let allPhotos = [];   // flat list: { url, key, filename, guest }
   let lbIndex   = 0;
+
+  // Pull the couple's names for the header/title (WED-4 dynamic name)
+  (async () => {
+    try {
+      const info = await (await fetch(`${API}/info`)).json();
+      if (info && info.names) {
+        document.getElementById("brand").textContent = info.names;
+        document.title = `Gallery — ${info.names}`;
+      }
+    } catch { /* keep default header */ }
+  })();
+
+  // ── Share-with-guests panel: the QR + guest link, always retrievable here ──
+  (function setupSharePanel() {
+    const guestUrl = `${location.origin}/e/${SLUG}`;
+    document.getElementById("guestLink").textContent = guestUrl;
+    document.getElementById("galleryQr").src = `/e/${SLUG}/qr.png`;
+    document.getElementById("downloadQr").href = `/e/${SLUG}/qr.png`;
+
+    document.getElementById("copyLink").addEventListener("click", async () => {
+      const btn = document.getElementById("copyLink");
+      try {
+        await navigator.clipboard.writeText(guestUrl);
+        btn.textContent = "Copied!";
+      } catch {
+        btn.textContent = "Copy failed";
+      }
+      setTimeout(() => { btn.textContent = "Copy link"; }, 1500);
+    });
+  })();
 
   // ── DOM refs ───────────────────────────────────────────────────────────
 
@@ -374,7 +443,7 @@
 
   (async () => {
     try {
-      const res = await fetch("/api/me");
+      const res = await fetch(`${API}/me`);
       const { authenticated } = await res.json();
       if (authenticated) {
         showGallery();
@@ -397,7 +466,7 @@
     loginError.style.display = "none";
 
     try {
-      const res = await fetch("/api/login", {
+      const res = await fetch(`${API}/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ password: pw }),
@@ -430,7 +499,7 @@
   // ── Logout ─────────────────────────────────────────────────────────────
 
   logoutBtn.addEventListener("click", async () => {
-    await fetch("/api/logout", { method: "POST" });
+    await fetch(`${API}/logout`, { method: "POST" });
     galleryScreen.style.display = "none";
     headerActions.style.display = "none";
     loginScreen.style.display   = "flex";
@@ -450,7 +519,7 @@
     allPhotos = [];
 
     try {
-      const res = await fetch("/api/photos");
+      const res = await fetch(`${API}/photos`);
       if (res.status === 401) {
         // Session expired
         galleryScreen.style.display = "none";
@@ -540,7 +609,7 @@
     // The server builds the zip and sends it as a download.
     // Using an anchor click keeps the browser's native download UI.
     const a = document.createElement("a");
-    a.href = "/api/download-zip";
+    a.href = `${API}/download-zip`;
     a.download = "wedding_photos.zip";
     a.style.display = "none";
     document.body.appendChild(a);
@@ -615,7 +684,7 @@
     lbDelete.textContent = "Deleting…";
 
     try {
-      const res = await fetch("/api/delete", {
+      const res = await fetch(`${API}/delete`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ key: photo.key }),

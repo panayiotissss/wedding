@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Orestis &amp; Athina Wedding</title>
+  <title>Share your photos</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&display=swap" rel="stylesheet" />
@@ -14,8 +14,6 @@
       --rose: #c9a9a6;
       --rose-dark: #b89490;
       --ink: #4a4442;
-      /* An elegant serif for names/headings; falls back to Georgia if the
-         web font is slow or blocked, so the page always looks intentional. */
       --serif: "Cormorant Garamond", Georgia, "Times New Roman", serif;
     }
 
@@ -27,7 +25,6 @@
       min-height: 100vh;
     }
 
-    /* ── Header ── */
     header {
       display: flex;
       justify-content: space-between;
@@ -57,7 +54,6 @@
     }
     .login-link:hover { background: #fdf0ef; }
 
-    /* ── Main card ── */
     main {
       max-width: 440px;
       margin: 2.5rem auto;
@@ -83,7 +79,6 @@
       font-size: 0.85rem;
       margin-bottom: 1rem;
     }
-    /* Small decorative divider between the title block and the form */
     .divider {
       display: flex;
       align-items: center;
@@ -101,7 +96,6 @@
     }
     .divider::before { --dir: left; }
 
-    /* ── Form elements ── */
     label {
       display: block;
       font-size: 0.8rem;
@@ -124,7 +118,6 @@
     }
     input[type="text"]:focus { border-color: #c9a9a6; }
 
-    /* ── Drop zone ── */
     .drop-zone {
       border: 2px dashed #ddd;
       border-radius: 10px;
@@ -144,13 +137,12 @@
       inset: 0;
       opacity: 0;
       cursor: pointer;
-      font-size: 0; /* hides iOS tooltip */
+      font-size: 0;
     }
     .drop-zone .dz-icon { font-size: 2.25rem; margin-bottom: 0.5rem; }
     .drop-zone .dz-primary { font-weight: 500; color: #555; font-size: 0.95rem; }
     .drop-zone .dz-secondary { color: #aaa; font-size: 0.78rem; margin-top: 0.25rem; }
 
-    /* ── Preview grid ── */
     .preview-grid {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
@@ -186,7 +178,6 @@
     .badge-done     { background: rgba(76,175,80,0.85);  color: #fff; }
     .badge-error    { background: rgba(211,47,47,0.85);  color: #fff; }
 
-    /* ── Upload button ── */
     .btn-upload {
       display: block;
       width: 100%;
@@ -204,7 +195,6 @@
     .btn-upload:hover:not(:disabled) { background: #b89490; }
     .btn-upload:disabled { opacity: 0.55; cursor: not-allowed; }
 
-    /* ── Toast message ── */
     .toast {
       margin-top: 1rem;
       padding: 0.75rem 1rem;
@@ -216,19 +206,23 @@
     .toast.success { background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; }
     .toast.error   { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
     .toast.info    { background: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe; }
+
+    .state-msg { text-align: center; padding: 2.5rem 1rem; color: #9a8f88; }
+    .state-msg .icon { font-size: 2.5rem; display: block; margin-bottom: 0.75rem; }
   </style>
 </head>
 <body>
 
 <header>
-  <span class="brand">Orestis &amp; Athina</span>
-  <a href="/gallery" class="login-link">Couple login</a>
+  <span class="brand" id="brand">Wedding gallery</span>
+  <a href="#" id="loginLink" class="login-link">Couple login</a>
 </header>
 
 <main>
-  <div class="card">
+  <!-- Active gallery: the upload form -->
+  <div class="card" id="uploadCard" style="display:none">
     <h1>Share your photos</h1>
-    <p class="subtitle">Help us capture every moment of our special day</p>
+    <p class="subtitle" id="uploadSubtitle">Help us capture every moment of our special day</p>
     <div class="divider">&#10084;</div>
 
     <label for="guestName">Your name</label>
@@ -237,15 +231,10 @@
 
     <label>Photos &amp; videos</label>
     <div class="drop-zone" id="dropZone">
-      <!--
-        No `capture` attribute — that forces camera-only on some phones.
-        Without it, iOS/Android shows "Take Photo", "Photo Library", etc.
-        accept="image/*,video/*" still restricts the picker to media.
-      -->
       <input type="file" id="fileInput" multiple accept="image/*,video/*" />
       <div class="dz-icon">&#128247;</div>
       <p class="dz-primary">Tap to choose or drag &amp; drop</p>
-      <p class="dz-secondary">Photos &amp; videos · up to 200 MB each</p>
+      <p class="dz-secondary">Photos &amp; videos · up to 500 MB each</p>
     </div>
 
     <div class="preview-grid" id="previewGrid" style="display:none"></div>
@@ -254,18 +243,33 @@
 
     <div class="toast" id="toast"></div>
   </div>
+
+  <!-- Inactive / not-found states -->
+  <div class="card" id="stateCard" style="display:none">
+    <div class="state-msg" id="stateMsg"><span class="icon">⏳</span>Loading…</div>
+  </div>
 </main>
 
 <script>
   "use strict";
 
-  const MAX_SIZE = 200 * 1024 * 1024;
+  // ── Multi-tenant: this event's slug lives in the URL (/e/<slug>)
+  const SLUG = location.pathname.split("/")[2] || "";
+  const API  = `/api/e/${SLUG}`;
+
+  const MAX_SIZE = 500 * 1024 * 1024;
   const ALLOWED = new Set([
     "image/jpeg","image/png","image/gif","image/webp",
     "image/heic","image/heif",
     "video/mp4","video/quicktime","video/x-msvideo",
   ]);
 
+  const uploadCard  = document.getElementById("uploadCard");
+  const stateCard   = document.getElementById("stateCard");
+  const stateMsg    = document.getElementById("stateMsg");
+  const brand       = document.getElementById("brand");
+  const loginLink   = document.getElementById("loginLink");
+  const subtitle    = document.getElementById("uploadSubtitle");
   const nameInput   = document.getElementById("guestName");
   const fileInput   = document.getElementById("fileInput");
   const dropZone    = document.getElementById("dropZone");
@@ -275,6 +279,38 @@
 
   let selectedFiles = [];
 
+  loginLink.href = `/e/${SLUG}/gallery`;
+
+  // ── Boot: fetch this event's info (WED-4 name + WED-7 paywall gate) ───────
+  (async () => {
+    try {
+      const res = await fetch(`${API}/info`);
+      if (res.status === 404) return showState("💌", "This gallery link isn't valid. Please double-check with the couple.");
+      const info = await res.json();
+
+      if (info.names) {
+        brand.textContent = info.names;
+        document.title = `Share your photos — ${info.names}`;
+      }
+
+      if (info.active) {
+        showState(null);              // hide state card
+        uploadCard.style.display = "block";
+      } else {
+        showState("🔒", "This gallery isn't active yet. The couple needs to finish setting it up. Please check back soon!");
+      }
+    } catch {
+      showState("⚠️", "Couldn't load this gallery. Please check your connection and try again.");
+    }
+  })();
+
+  function showState(icon, text) {
+    if (icon === null) { stateCard.style.display = "none"; return; }
+    uploadCard.style.display = "none";
+    stateCard.style.display = "block";
+    stateMsg.innerHTML = `<span class="icon">${icon}</span>${text}`;
+  }
+
   // ── File selection ──────────────────────────────────────────────────────
 
   fileInput.addEventListener("change", () => {
@@ -282,7 +318,6 @@
     renderPreviews();
   });
 
-  // Drag-and-drop (desktop bonus)
   dropZone.addEventListener("dragover", e => {
     e.preventDefault();
     dropZone.classList.add("over");
@@ -304,7 +339,6 @@
       item.className = "preview-item";
       item.id = `pi-${i}`;
 
-      // URL.createObjectURL is purely local — nothing is sent to the server here.
       const src = URL.createObjectURL(file);
       if (file.type.startsWith("video/")) {
         const v = document.createElement("video");
@@ -335,6 +369,11 @@
   }
 
   // ── Upload ──────────────────────────────────────────────────────────────
+  // Uploads run CONCURRENTLY (a small pool) with a live % per file. Files still
+  // go browser → R2 directly; parallelism + real progress is what makes big
+  // batches (and videos) feel fast instead of frozen.
+
+  const CONCURRENCY = 3;
 
   uploadBtn.addEventListener("click", async () => {
     const name = nameInput.value.trim();
@@ -344,7 +383,6 @@
       return;
     }
 
-    // Client-side guard (server also validates)
     const bad = selectedFiles.filter(f => !ALLOWED.has(f.type) || f.size > MAX_SIZE);
     if (bad.length) {
       showToast(
@@ -359,51 +397,25 @@
     uploadBtn.textContent = "Uploading…";
     hideToast();
 
-    let ok = 0, fail = 0;
+    let ok = 0, fail = 0, cursor = 0;
 
-    for (let i = 0; i < selectedFiles.length; i++) {
-      const file = selectedFiles[i];
-      setBadge(i, "uploading", "Uploading…");
-
-      try {
-        // Step 1 — ask our server for a presigned PUT URL.
-        // The server validates type + size and returns a time-limited URL.
-        const res = await fetch("/api/upload-url", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            filename:     file.name,
-            content_type: file.type,
-            guest_name:   name,
-            file_size:    file.size,
-          }),
-        });
-
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
-          throw new Error(err.detail || `Server error ${res.status}`);
+    // Worker pool: each worker grabs the next file until the queue is drained.
+    async function worker() {
+      while (cursor < selectedFiles.length) {
+        const i = cursor++;
+        try {
+          await uploadOne(i, selectedFiles[i]);
+          ok++;
+        } catch (err) {
+          console.error("Upload error for", selectedFiles[i] && selectedFiles[i].name, err);
+          setBadge(i, "error", "✗ Failed");
+          fail++;
         }
-
-        const { url } = await res.json();
-
-        // Step 2 — PUT the file DIRECTLY to R2.
-        // Our server is NOT in the data path; R2 receives the bytes.
-        const put = await fetch(url, {
-          method: "PUT",
-          headers: { "Content-Type": file.type },
-          body: file,
-        });
-
-        if (!put.ok) throw new Error(`R2 rejected upload: ${put.status}`);
-
-        setBadge(i, "done", "✓ Done");
-        ok++;
-      } catch (err) {
-        setBadge(i, "error", "✗ Failed");
-        console.error("Upload error for", file.name, err);
-        fail++;
       }
     }
+
+    const pool = Array.from({ length: Math.min(CONCURRENCY, selectedFiles.length) }, worker);
+    await Promise.all(pool);
 
     uploadBtn.textContent = "Upload more";
     uploadBtn.disabled = false;
@@ -413,9 +425,51 @@
     } else if (ok === 0) {
       showToast(`All uploads failed. Check your connection and try again.`, "error");
     } else {
-      showToast(`${ok} uploaded, ${fail} failed. You can retry the failed ones.`, "info");
+      showToast(`${ok} uploaded, ${fail} failed. Tap "Upload more" to retry the failed ones.`, "info");
     }
   });
+
+  async function uploadOne(i, file) {
+    setBadge(i, "uploading", "0%");
+
+    // Step 1 — presigned PUT URL from our server (validates type + size).
+    const res = await fetch(`${API}/upload-url`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        filename:     file.name,
+        content_type: file.type,
+        guest_name:   nameInput.value.trim(),
+        file_size:    file.size,
+      }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || `Server error ${res.status}`);
+    }
+    const { url } = await res.json();
+
+    // Step 2 — PUT straight to R2, with progress (XHR exposes upload progress; fetch doesn't).
+    await putWithProgress(url, file, pct => setBadge(i, "uploading", pct + "%"));
+    setBadge(i, "done", "✓ Done");
+  }
+
+  function putWithProgress(url, file, onProgress) {
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open("PUT", url);
+      xhr.setRequestHeader("Content-Type", file.type);
+      xhr.upload.onprogress = e => {
+        if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100));
+      };
+      xhr.onload = () =>
+        (xhr.status >= 200 && xhr.status < 300)
+          ? resolve()
+          : reject(new Error(`R2 rejected upload: ${xhr.status}`));
+      xhr.onerror = () => reject(new Error("network error"));
+      xhr.send(file);
+    });
+  }
 
   // ── Utilities ────────────────────────────────────────────────────────────
 
@@ -433,9 +487,7 @@
     toast.style.display = "block";
   }
 
-  function hideToast() {
-    toast.style.display = "none";
-  }
+  function hideToast() { toast.style.display = "none"; }
 
   function truncate(str, max) {
     return str.length > max ? str.slice(0, max - 1) + "…" : str;

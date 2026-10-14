@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Create your gallery — Confetti</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root { --rose: #c9a9a6; --rose-dark: #b89490; --ink: #4a4442;
+      --serif: "Cormorant Garamond", Georgia, "Times New Roman", serif; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, sans-serif;
+      background: linear-gradient(160deg, #faf8f5 0%, #f4ece6 100%);
+      background-attachment: fixed; color: #333; min-height: 100vh;
+    }
+    header { padding: 1rem 1.5rem; max-width: 1000px; margin: 0 auto; }
+    .brand { font-family: var(--serif); font-size: 1.6rem; font-weight: 600; color: var(--ink); text-decoration: none; }
+
+    main { max-width: 440px; margin: 2rem auto 3rem; padding: 0 1rem; }
+    .card { background: #fff; border-radius: 12px; padding: 2rem 1.75rem; box-shadow: 0 2px 12px rgba(0,0,0,0.06); }
+    .card h1 { font-family: var(--serif); font-size: 2rem; font-weight: 600; text-align: center; color: var(--ink); margin-bottom: 0.15rem; }
+    .subtitle { text-align: center; color: #a79b94; font-size: 0.85rem; margin-bottom: 1.75rem; }
+
+    label { display: block; font-size: 0.78rem; font-weight: 500; text-transform: uppercase;
+      letter-spacing: 0.06em; color: #888; margin-bottom: 0.35rem; }
+    input { width: 100%; padding: 0.65rem 0.85rem; border: 1.5px solid #ddd; border-radius: 8px;
+      font-size: 1rem; outline: none; transition: border-color 0.15s; margin-bottom: 0.35rem; background: #fdfcfb; }
+    input:focus { border-color: #c9a9a6; }
+    .hint { font-size: 0.75rem; color: #b3a89f; margin-bottom: 1.1rem; }
+
+    .btn { display: block; width: 100%; padding: 0.85rem; background: var(--rose); color: #fff;
+      border: none; border-radius: 8px; font-size: 1.02rem; font-weight: 500; cursor: pointer;
+      transition: background 0.15s, opacity 0.15s; letter-spacing: 0.02em; margin-top: 0.5rem; }
+    .btn:hover:not(:disabled) { background: var(--rose-dark); }
+    .btn:disabled { opacity: 0.55; cursor: not-allowed; }
+
+    .error { margin-top: 0.9rem; padding: 0.6rem 0.85rem; background: #fef2f2; color: #991b1b;
+      border: 1px solid #fecaca; border-radius: 6px; font-size: 0.85rem; text-align: center; display: none; }
+    .pay-note { text-align: center; font-size: 0.8rem; color: #a79b94; margin-top: 1rem; }
+  </style>
+</head>
+<body>
+
+<header><a href="/" class="brand">Confetti</a></header>
+
+<main>
+  <div class="card">
+    <h1>Create your gallery</h1>
+    <p class="subtitle">Set it up in under a minute</p>
+
+    <label for="name1">Partner 1</label>
+    <input type="text" id="name1" placeholder="e.g. Orestis" autocomplete="off" />
+
+    <label for="name2">Partner 2</label>
+    <input type="text" id="name2" placeholder="e.g. Athina" autocomplete="off" />
+    <p class="hint">Shown together as “Partner&nbsp;1 &amp; Partner&nbsp;2” at the top of your pages.</p>
+
+    <label for="email">Your email</label>
+    <input type="email" id="email" placeholder="you@example.com" autocomplete="email" />
+    <p class="hint">You'll log back in with this email + your password. Also used for your receipt.</p>
+
+    <label for="password">Gallery password</label>
+    <input type="password" id="password" placeholder="At least 6 characters" autocomplete="new-password" />
+    <p class="hint">You'll use this to open your private gallery. Keep it safe.</p>
+
+    <label for="password2">Confirm password</label>
+    <input type="password" id="password2" placeholder="Repeat password" autocomplete="new-password" />
+
+    <label for="accessCode">Access code (optional)</label>
+    <input type="text" id="accessCode" placeholder="Leave blank unless you have one" autocomplete="off" />
+    <p class="hint">Have a free access code? Enter it to skip payment.</p>
+
+    <button class="btn" id="submitBtn">Continue to payment</button>
+    <p class="pay-note">Secure checkout · €19 one-time</p>
+    <p class="pay-note">Already created a gallery? <a href="/login" style="color:var(--rose-dark)">Log in</a></p>
+    <div class="error" id="error"></div>
+  </div>
+</main>
+
+<script>
+  "use strict";
+  const name1El  = document.getElementById("name1");
+  const name2El  = document.getElementById("name2");
+  const emailEl  = document.getElementById("email");
+  const pwEl     = document.getElementById("password");
+  const pw2El    = document.getElementById("password2");
+  const codeEl   = document.getElementById("accessCode");
+  const btn      = document.getElementById("submitBtn");
+  const errorEl  = document.getElementById("error");
+
+  function showError(msg) { errorEl.innerHTML = msg; errorEl.style.display = "block"; }
+  function hideError() { errorEl.style.display = "none"; }
+
+  btn.addEventListener("click", submit);
+
+  async function submit() {
+    hideError();
+    const p1 = name1El.value.trim();
+    const p2 = name2El.value.trim();
+    const email = emailEl.value.trim();
+    const password = pwEl.value;
+
+    if (!p1 || !p2) return showError("Please enter both names.");
+    if (!email.includes("@")) return showError("Please enter a valid email.");
+    if (password.length < 6) return showError("Password must be at least 6 characters.");
+    if (password !== pw2El.value) return showError("Passwords don't match.");
+
+    // Combine the two fields into the display name shown at the top of the pages.
+    const couple_names = `${p1} & ${p2}`;
+
+    btn.disabled = true;
+    btn.textContent = "Setting up…";
+
+    try {
+      const res = await fetch("/api/events", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ couple_names, password, email, access_code: codeEl.value.trim() || null }),
+      });
+
+      if (res.status === 409) {
+        showError('That email already has a gallery. <a href="/login" style="color:var(--rose-dark)">Log in instead</a>.');
+        btn.disabled = false;
+        btn.textContent = "Continue to payment";
+        return;
+      }
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || `Server error ${res.status}`);
+      }
+
+      const { payment_url } = await res.json();
+      // Either Stripe's hosted checkout, or (free path) our own success page.
+      window.location.href = payment_url;
+    } catch (err) {
+      showError(typeof err.message === "string" ? err.message : "Something went wrong. Please try again.");
+      btn.disabled = false;
+      btn.textContent = "Continue to payment";
+    }
+  }
+</script>
+</body>
+</html>

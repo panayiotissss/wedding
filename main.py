@@ -1,135 +1,319 @@
 """
-Wedding photo-sharing app.
+Multi-tenant wedding photo-sharing SaaS.
 
-Two roles:
-  - Guests   → POST /api/upload-url  (public)
-  - Couple   → POST /api/login, GET /api/photos, GET /api/download-zip (session-gated)
+Each couple ("event") gets:
+  - a public upload page   /e/<slug>            (guests, gated on payment)
+  - a private gallery      /e/<slug>/gallery    (couple, password-gated)
+  - isolated storage in R2 under events/<id>/   (WED-5)
+  - a dynamic name shown on every page          (WED-4)
+  - auto-deletion 1 year after payment          (WED-6)
+
+Onboarding is self-serve + pay:
+  /  →  /create  →  Stripe Payment Link  →  webhook activates  →  /create/success
+(WED-2 multi-user, WED-7 pay-to-unlock).
 """
 
-import os
+import io
 import re
 import uuid
 import zipfile
+from contextlib import asynccontextmanager
+from datetime import timedelta
 from pathlib import Path
 
-import boto3
-from botocore.config import Config
-from dotenv import load_dotenv
-from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, field_validator
+from sqlalchemy.orm import Session
 from starlette.middleware.sessions import SessionMiddleware
 
-# ---------------------------------------------------------------------------
-# Config — everything comes from env vars so secrets never touch the code.
-# ---------------------------------------------------------------------------
+import config
+import payments
+import storage
+from db import Event, get_db, init_db, now_utc
+from security import hash_password, verify_password
 
-load_dotenv()
-
-def _require(name: str) -> str:
-    v = os.environ.get(name)
-    if not v:
-        raise RuntimeError(f"Missing required env var: {name}")
-    return v
-
-R2_ACCOUNT_ID       = _require("R2_ACCOUNT_ID")
-R2_ACCESS_KEY_ID    = _require("R2_ACCESS_KEY_ID")
-R2_SECRET_ACCESS_KEY = _require("R2_SECRET_ACCESS_KEY")
-R2_BUCKET           = _require("R2_BUCKET")
-R2_ENDPOINT         = _require("R2_ENDPOINT")
-GALLERY_PASSWORD    = _require("GALLERY_PASSWORD")
-SESSION_SECRET      = _require("SESSION_SECRET")
-
-# Cookie is HTTPS-only by default (correct for Render, which serves HTTPS).
-# Set COOKIE_SECURE=false only for local http://localhost testing.
-COOKIE_SECURE = os.environ.get("COOKIE_SECURE", "true").lower() != "false"
-
-MAX_FILE_SIZE = 200 * 1024 * 1024  # 200 MB — generous for videos
-
-# These are the only content-types we'll presign for.
-# R2 enforces the type matches because ContentType is baked into the presigned URL.
-ALLOWED_TYPES = {
-    "image/jpeg",
-    "image/png",
-    "image/gif",
-    "image/webp",
-    "image/heic",   # iOS HEIC
-    "image/heif",   # iOS HEIF variant
-    "video/mp4",
-    "video/quicktime",  # .mov
-    "video/x-msvideo",  # .avi
-}
-
-# ---------------------------------------------------------------------------
-# R2 client  (boto3 understands any S3-compatible endpoint)
-# ---------------------------------------------------------------------------
-
-s3 = boto3.client(
-    "s3",
-    endpoint_url=R2_ENDPOINT,
-    aws_access_key_id=R2_ACCESS_KEY_ID,
-    aws_secret_access_key=R2_SECRET_ACCESS_KEY,
-    region_name="auto",
-    config=Config(signature_version="s3v4"),
-)
 
 # ---------------------------------------------------------------------------
 # App + middleware
 # ---------------------------------------------------------------------------
 
-app = FastAPI(docs_url=None, redoc_url=None)  # hide docs in production
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    init_db()
+    yield
 
-# SessionMiddleware stores a signed JSON blob in a cookie.
-# The SESSION_SECRET is the HMAC signing key — keep it secret.
+
+app = FastAPI(docs_url=None, redoc_url=None, lifespan=lifespan)
+
 app.add_middleware(
     SessionMiddleware,
-    secret_key=SESSION_SECRET,
+    secret_key=config.SESSION_SECRET,
     session_cookie="wed_session",
     max_age=60 * 60 * 24 * 7,  # 7 days
-    https_only=COOKIE_SECURE,   # True in production (HTTPS on Render)
+    https_only=config.COOKIE_SECURE,
     same_site="lax",
 )
+
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
 def sanitize_name(name: str) -> str:
-    """Turn a guest name into a safe S3 key segment."""
     name = name.strip().lower()
-    name = re.sub(r"\s+", "_", name)          # spaces → underscores
-    name = re.sub(r"[^a-z0-9_]", "", name)   # drop everything else
+    name = re.sub(r"\s+", "_", name)
+    name = re.sub(r"[^a-z0-9_]", "", name)
     return name[:50] or "guest"
 
 
 def sanitize_filename(name: str) -> str:
-    """Strip path separators and dangerous chars from an uploaded filename."""
     return re.sub(r"[^a-zA-Z0-9._-]", "_", Path(name).name)[:100]
 
 
-def require_auth(request: Request) -> None:
-    """FastAPI dependency — raises 401 if the session cookie isn't valid."""
-    if not request.session.get("authenticated"):
+def slugify_names(name: str) -> str:
+    """'Orestis & Athina' -> 'orestis-athina' for a readable R2 folder."""
+    s = re.sub(r"[&/]+", " ", name.strip().lower())
+    s = re.sub(r"[^a-z0-9]+", "-", s).strip("-")
+    return s[:60] or "couple"
+
+
+def _storage_key(ev: "Event") -> str:
+    """The R2 folder for this event: readable prefix, or id for legacy rows."""
+    return ev.storage_prefix or ev.id
+
+
+def get_event_or_404(db: Session, slug: str) -> Event:
+    ev = db.query(Event).filter(Event.slug == slug).first()
+    if not ev:
+        raise HTTPException(status_code=404, detail="Gallery not found")
+    return ev
+
+
+def require_event_auth(request: Request, slug: str) -> None:
+    """Raise 401 unless this session has authenticated for this event's gallery."""
+    if slug not in request.session.get("auth_events", []):
         raise HTTPException(status_code=401, detail="Not authenticated")
 
 
+def _grant_auth(request: Request, slug: str) -> None:
+    auth = request.session.get("auth_events", [])
+    if slug not in auth:
+        auth.append(slug)
+        request.session["auth_events"] = auth
+
+
+def _activate(ev: Event) -> None:
+    """Mark an event paid & active, and set its 1-year expiry (WED-6)."""
+    ev.status = "active"
+    ev.paid_at = now_utc()
+    ev.expires_at = ev.paid_at + timedelta(days=config.EVENT_TTL_DAYS)
+
+
+def _unique_slug(db: Session) -> str:
+    for _ in range(10):
+        slug = uuid.uuid4().hex[:8]
+        if not db.query(Event).filter(Event.slug == slug).first():
+            return slug
+    raise HTTPException(status_code=500, detail="Could not allocate a slug")
+
+
 # ---------------------------------------------------------------------------
-# Page routes  (serve HTML files from ./static/)
+# Page routes (serve static HTML shells; the JS reads the slug from the URL)
 # ---------------------------------------------------------------------------
 
 @app.get("/")
-def upload_page():
-    return FileResponse("static/index.html")
+def landing_page():
+    return FileResponse("static/landing.html")
 
 
-@app.get("/gallery")
-def gallery_page():
+@app.get("/create")
+def create_page():
+    return FileResponse("static/create.html")
+
+
+@app.get("/create/success")
+def success_page():
+    return FileResponse("static/success.html")
+
+
+@app.get("/login")
+def login_page():
+    return FileResponse("static/login.html")
+
+
+@app.get("/e/{slug}")
+def event_upload_page(slug: str):
+    return FileResponse("static/event.html")
+
+
+@app.get("/e/{slug}/gallery")
+def event_gallery_page(slug: str):
     return FileResponse("static/gallery.html")
 
 
+@app.get("/e/{slug}/qr.png")
+def event_qr(slug: str, db: Session = Depends(get_db)):
+    """Printable QR code pointing at this event's upload page."""
+    ev = get_event_or_404(db, slug)
+    import qrcode
+
+    url = f"{config.PUBLIC_BASE_URL}/e/{ev.slug}"
+    img = qrcode.make(url)
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    buf.seek(0)
+    return Response(content=buf.getvalue(), media_type="image/png")
+
+
 # ---------------------------------------------------------------------------
-# API — upload presigned URL  (PUBLIC, guests call this)
+# Onboarding — create event + payment (WED-2, WED-7)
+# ---------------------------------------------------------------------------
+
+def _normalize_email(v: str) -> str:
+    return v.strip().lower()
+
+
+class CreateEventRequest(BaseModel):
+    couple_names: str
+    password: str
+    email: str                       # now REQUIRED — it's the login identifier
+    access_code: str | None = None   # optional comp code (skips payment)
+
+    @field_validator("couple_names")
+    @classmethod
+    def check_names(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("Couple names are required")
+        return v.strip()[:200]
+
+    @field_validator("password")
+    @classmethod
+    def check_password(cls, v: str) -> str:
+        if len(v) < 6:
+            raise ValueError("Password must be at least 6 characters")
+        return v
+
+    @field_validator("email")
+    @classmethod
+    def check_email(cls, v: str) -> str:
+        v = v.strip()
+        if "@" not in v or "." not in v.split("@")[-1]:
+            raise ValueError("A valid email is required")
+        return v
+
+
+@app.post("/api/events")
+def create_event(body: CreateEventRequest, request: Request, db: Session = Depends(get_db)):
+    email = _normalize_email(body.email)
+
+    # Email is the login identifier, so it must be unique.
+    if db.query(Event).filter(Event.contact_email == email).first():
+        raise HTTPException(
+            status_code=409,
+            detail="An account with this email already exists. Please log in instead.",
+        )
+
+    slug = _unique_slug(db)
+    ev = Event(
+        slug=slug,
+        couple_names=body.couple_names,
+        password_hash=hash_password(body.password),
+        contact_email=email,
+        status="pending_payment",
+        # Readable R2 folder: couple name + slug (slug guarantees uniqueness,
+        # since two different couples can share the same names).
+        storage_prefix=f"{slugify_names(body.couple_names)}-{slug}",
+    )
+
+    # A valid comp code lets a friend skip payment even when Stripe is on.
+    code_ok = bool(config.FREE_ACCESS_CODE) and (body.access_code or "").strip() == config.FREE_ACCESS_CODE
+
+    if config.PAYMENTS_ENABLED and not code_ok:
+        db.add(ev)
+        db.commit()
+        _grant_auth(request, ev.slug)  # so the couple lands in their gallery after paying
+        request.session["last_slug"] = ev.slug  # so /create/success works after the Stripe round-trip
+        return {"slug": ev.slug, "status": ev.status, "payment_url": payments.payment_url(ev)}
+
+    # Free path: stub mode (no Stripe) OR a valid comp code — unlock immediately.
+    _activate(ev)
+    db.add(ev)
+    db.commit()
+    _grant_auth(request, ev.slug)
+    request.session["last_slug"] = ev.slug
+    return {"slug": ev.slug, "status": ev.status, "payment_url": f"/create/success?slug={ev.slug}"}
+
+
+class EmailLoginRequest(BaseModel):
+    email: str
+    password: str
+
+
+@app.post("/api/login")
+def email_login(body: EmailLoginRequest, request: Request, db: Session = Depends(get_db)):
+    """Couple login by the email + password collected at signup — so they can get
+    back into their gallery from any device without needing the original link."""
+    email = _normalize_email(body.email)
+    ev = db.query(Event).filter(Event.contact_email == email).first()
+    if not ev or not verify_password(body.password, ev.password_hash):
+        raise HTTPException(status_code=401, detail="Wrong email or password")
+    _grant_auth(request, ev.slug)
+    request.session["last_slug"] = ev.slug
+    return {"slug": ev.slug}
+
+
+@app.get("/api/my-latest")
+def my_latest(request: Request):
+    """The gallery this browser session most recently created — lets the
+    Stripe success page find it without a slug in the (static) return URL."""
+    return {"slug": request.session.get("last_slug")}
+
+
+@app.get("/api/events/{slug}/status")
+def event_status(slug: str, db: Session = Depends(get_db)):
+    ev = get_event_or_404(db, slug)
+    return {"slug": ev.slug, "status": ev.status, "names": ev.couple_names}
+
+
+@app.post("/api/stripe/webhook")
+async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
+    if not config.PAYMENTS_ENABLED:
+        raise HTTPException(status_code=404, detail="Payments not configured")
+
+    payload = await request.body()
+    sig = request.headers.get("stripe-signature")
+    try:
+        event = payments.verify_webhook(payload, sig)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid signature")
+
+    if event["type"] == "checkout.session.completed":
+        session = event["data"]["object"]
+        ref = session.get("client_reference_id")
+        if ref:
+            ev = db.query(Event).filter(Event.id == ref).first()
+            if ev and ev.status != "active":
+                _activate(ev)
+                ev.stripe_ref = session.get("id")
+                db.commit()
+
+    return {"received": True}
+
+
+# ---------------------------------------------------------------------------
+# Per-event public info (WED-4 dynamic name + paywall state)
+# ---------------------------------------------------------------------------
+
+@app.get("/api/e/{slug}/info")
+def event_info(slug: str, db: Session = Depends(get_db)):
+    ev = get_event_or_404(db, slug)
+    return {"slug": ev.slug, "names": ev.couple_names, "active": ev.status == "active"}
+
+
+# ---------------------------------------------------------------------------
+# Guest upload (PUBLIC, gated on payment)
 # ---------------------------------------------------------------------------
 
 class UploadRequest(BaseModel):
@@ -141,15 +325,15 @@ class UploadRequest(BaseModel):
     @field_validator("content_type")
     @classmethod
     def check_type(cls, v: str) -> str:
-        if v not in ALLOWED_TYPES:
+        if v not in config.ALLOWED_TYPES:
             raise ValueError(f"Not an allowed file type: {v}")
         return v
 
     @field_validator("file_size")
     @classmethod
     def check_size(cls, v: int) -> int:
-        if v > MAX_FILE_SIZE:
-            raise ValueError(f"File exceeds {MAX_FILE_SIZE // 1024 // 1024} MB limit")
+        if v > config.MAX_FILE_SIZE:
+            raise ValueError(f"File exceeds {config.MAX_FILE_SIZE // 1024 // 1024} MB limit")
         return v
 
     @field_validator("guest_name")
@@ -160,140 +344,91 @@ class UploadRequest(BaseModel):
         return v
 
 
-@app.post("/api/upload-url")
-def get_upload_url(body: UploadRequest):
-    """
-    Return a presigned PUT URL the browser can use to upload directly to R2.
+@app.post("/api/e/{slug}/upload-url")
+def get_upload_url(slug: str, body: UploadRequest, db: Session = Depends(get_db)):
+    ev = get_event_or_404(db, slug)
+    if ev.status != "active":
+        raise HTTPException(status_code=403, detail="This gallery isn't active yet.")
 
-    Why presigned URLs?
-    The browser sends the file straight to R2 — our server is never in the data
-    path.  R2 enforces ContentType because we bake it into the presigned params,
-    preventing type-spoofing attacks.
-    """
-    safe_name = sanitize_name(body.guest_name)
-    safe_file = sanitize_filename(body.filename)
-    key = f"photos/{safe_name}/{uuid.uuid4()}-{safe_file}"
-
-    # The presigned URL encodes: Bucket, Key, ContentType, and an expiry.
-    # R2 will reject any PUT that doesn't match those params exactly.
-    presigned_url = s3.generate_presigned_url(
-        "put_object",
-        Params={
-            "Bucket": R2_BUCKET,
-            "Key": key,
-            "ContentType": body.content_type,
-        },
-        ExpiresIn=3600,  # 1 hour — plenty of time for the upload
+    key = (
+        storage.photos_prefix(_storage_key(ev))
+        + f"{sanitize_name(body.guest_name)}/{uuid.uuid4()}-{sanitize_filename(body.filename)}"
     )
-
-    return {"url": presigned_url, "key": key}
+    return {"url": storage.presign_put(key, body.content_type), "key": key}
 
 
 # ---------------------------------------------------------------------------
-# API — login / logout
+# Couple login / logout (per-event password)
 # ---------------------------------------------------------------------------
 
 class LoginRequest(BaseModel):
     password: str
 
 
-@app.post("/api/login")
-def login(body: LoginRequest, request: Request):
-    """
-    Check password against GALLERY_PASSWORD env var.
-    On success, set authenticated=True in the signed session cookie.
-    No user table, no JWT — just a single shared secret for the couple.
-    """
-    if body.password != GALLERY_PASSWORD:
+@app.post("/api/e/{slug}/login")
+def login(slug: str, body: LoginRequest, request: Request, db: Session = Depends(get_db)):
+    ev = get_event_or_404(db, slug)
+    if not verify_password(body.password, ev.password_hash):
         raise HTTPException(status_code=401, detail="Wrong password")
-    request.session["authenticated"] = True
+    _grant_auth(request, slug)
     return {"ok": True}
 
 
-@app.post("/api/logout")
-def logout(request: Request):
-    request.session.clear()
+@app.post("/api/e/{slug}/logout")
+def logout(slug: str, request: Request):
+    auth = request.session.get("auth_events", [])
+    request.session["auth_events"] = [s for s in auth if s != slug]
     return {"ok": True}
 
 
-@app.get("/api/me")
-def me(request: Request):
-    """Quick check so the frontend can tell if a session is still valid."""
-    return {"authenticated": bool(request.session.get("authenticated"))}
+@app.get("/api/e/{slug}/me")
+def me(slug: str, request: Request):
+    return {"authenticated": slug in request.session.get("auth_events", [])}
 
 
 # ---------------------------------------------------------------------------
-# API — photo list  (PROTECTED)
+# Gallery — photo list (PROTECTED)
 # ---------------------------------------------------------------------------
 
-@app.get("/api/photos")
-def list_photos(_: None = Depends(require_auth)):
-    """
-    List the bucket, group by guest, return presigned GET URLs.
+@app.get("/api/e/{slug}/photos")
+def list_photos(slug: str, request: Request, db: Session = Depends(get_db)):
+    ev = get_event_or_404(db, slug)
+    require_event_auth(request, slug)
 
-    Why presigned GETs?
-    The bucket stays private — we never make objects public.  The frontend
-    receives time-limited signed URLs that R2 validates per-request.
-    """
-    paginator = s3.get_paginator("list_objects_v2")
-    objects: list[dict] = []
-    for page in paginator.paginate(Bucket=R2_BUCKET, Prefix="photos/"):
-        objects.extend(page.get("Contents", []))
-
-    # Sort oldest → newest so gallery is chronological
+    prefix = storage.photos_prefix(_storage_key(ev))
+    objects = storage.list_prefix(prefix)
     objects.sort(key=lambda o: o["LastModified"])
 
     guests: dict[str, list] = {}
     for obj in objects:
-        parts = obj["Key"].split("/")
-        if len(parts) < 3:
-            continue  # malformed key, skip
-        guest = parts[1]
-        url = s3.generate_presigned_url(
-            "get_object",
-            Params={"Bucket": R2_BUCKET, "Key": obj["Key"]},
-            ExpiresIn=3600,
-        )
+        rel = obj["Key"][len(prefix):]          # <guest>/<file>
+        parts = rel.split("/")
+        if len(parts) < 2:
+            continue
+        guest = parts[0]
         guests.setdefault(guest, []).append(
             {
                 "key": obj["Key"],
-                "url": url,
+                "url": storage.presign_get(obj["Key"]),
                 "uploaded_at": obj["LastModified"].isoformat(),
                 "filename": parts[-1],
             }
         )
 
-    # Return as list of {guest, photos} for easy iteration in the frontend
-    return [
-        {"guest": g, "photos": photos} for g, photos in guests.items()
-    ]
+    return [{"guest": g, "photos": photos} for g, photos in guests.items()]
 
 
 # ---------------------------------------------------------------------------
-# API — download all as ZIP  (PROTECTED)
+# Gallery — download all as ZIP (PROTECTED, streamed)
 # ---------------------------------------------------------------------------
 
-@app.get("/api/download-zip")
-def download_zip(_: None = Depends(require_auth)):
-    """
-    Stream every object from R2 into a zip, on the fly.
+@app.get("/api/e/{slug}/download-zip")
+def download_zip(slug: str, request: Request, db: Session = Depends(get_db)):
+    ev = get_event_or_404(db, slug)
+    require_event_auth(request, slug)
+    prefix = storage.photos_prefix(_storage_key(ev))
 
-    Instead of building the whole zip in RAM first, we read each photo from R2
-    in 1 MB chunks and write it straight into the zip stream, so the server only
-    holds a chunk at a time.  This is safe even for a multi-GB wedding on a small
-    (512 MB) instance.
-
-    zipfile detects that our output sink isn't seekable and automatically writes
-    per-file data descriptors, so it never needs to seek back to patch headers.
-    Starlette runs this sync generator in a threadpool, so the blocking boto3
-    calls don't stall the event loop.
-    """
     class _ChunkSink:
-        """Minimal write-only, non-seekable sink that zipfile writes into.
-
-        We drain the accumulated bytes after each write and yield them to the
-        client, keeping memory bounded to roughly one chunk.
-        """
         def __init__(self):
             self._parts: list[bytes] = []
 
@@ -310,24 +445,20 @@ def download_zip(_: None = Depends(require_auth)):
             return data
 
     def generate():
-        paginator = s3.get_paginator("list_objects_v2")
-        objects: list[dict] = []
-        for page in paginator.paginate(Bucket=R2_BUCKET, Prefix="photos/"):
-            objects.extend(page.get("Contents", []))
-
+        objects = storage.list_prefix(prefix)
         sink = _ChunkSink()
-        # ZIP_STORED skips re-compression — images/videos are already compressed.
         with zipfile.ZipFile(sink, "w", zipfile.ZIP_STORED) as zf:
             for obj in objects:
                 key = obj["Key"]
-                parts = key.split("/")
-                guest = parts[1] if len(parts) > 2 else "unknown"
+                rel = key[len(prefix):]
+                parts = rel.split("/")
+                guest = parts[0] if len(parts) > 1 else "guest"
                 filename = parts[-1]
 
                 zinfo = zipfile.ZipInfo(f"{guest}/{filename}")
                 zinfo.compress_type = zipfile.ZIP_STORED
                 with zf.open(zinfo, mode="w") as dest:
-                    body = s3.get_object(Bucket=R2_BUCKET, Key=key)["Body"]
+                    body = storage.get_body(key)
                     for chunk in body.iter_chunks(chunk_size=1024 * 1024):
                         dest.write(chunk)
                         out = sink.drain()
@@ -336,7 +467,6 @@ def download_zip(_: None = Depends(require_auth)):
                 out = sink.drain()
                 if out:
                     yield out
-        # close() flushed the central directory into the sink — send the tail.
         tail = sink.drain()
         if tail:
             yield tail
@@ -349,30 +479,60 @@ def download_zip(_: None = Depends(require_auth)):
 
 
 # ---------------------------------------------------------------------------
-# API — delete a photo  (PROTECTED)
+# Gallery — delete a photo (PROTECTED)
 # ---------------------------------------------------------------------------
 
 class DeleteRequest(BaseModel):
     key: str
 
 
-@app.post("/api/delete")
-def delete_photo(body: DeleteRequest, _: None = Depends(require_auth)):
-    """
-    Delete one object from R2 by key.
+@app.post("/api/e/{slug}/delete")
+def delete_photo(slug: str, body: DeleteRequest, request: Request, db: Session = Depends(get_db)):
+    ev = get_event_or_404(db, slug)
+    require_event_auth(request, slug)
 
-    Only the couple (authenticated) can call this.  We refuse any key outside
-    the `photos/` prefix so a crafted request can't touch anything else in the
-    bucket.
-    """
-    if not body.key.startswith("photos/") or ".." in body.key:
+    # Refuse any key outside THIS event's photo prefix.
+    expected = storage.photos_prefix(_storage_key(ev))
+    if not body.key.startswith(expected) or ".." in body.key:
         raise HTTPException(status_code=400, detail="Invalid key")
-    s3.delete_object(Bucket=R2_BUCKET, Key=body.key)
+    storage.delete_key(body.key)
     return {"ok": True}
 
 
 # ---------------------------------------------------------------------------
-# Static files (CSS / JS assets if you ever add them)
+# Admin — auto-delete expired events (WED-6)
+# ---------------------------------------------------------------------------
+
+@app.post("/api/admin/cleanup")
+def cleanup(request: Request, db: Session = Depends(get_db)):
+    """Delete every event past its expiry, plus all its R2 objects.
+
+    Protect with the ADMIN_TOKEN env var and call on a schedule (Render Cron /
+    external cron / GitHub Action):  curl -X POST -H 'X-Admin-Token: ...' /api/admin/cleanup
+    """
+    if not config.ADMIN_TOKEN or request.headers.get("x-admin-token") != config.ADMIN_TOKEN:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    now = now_utc()
+    expired = (
+        db.query(Event)
+        .filter(Event.expires_at.isnot(None), Event.expires_at < now)
+        .all()
+    )
+
+    deleted: list[str] = []
+    for ev in expired:
+        for obj in storage.list_prefix(storage.event_root(_storage_key(ev))):
+            storage.delete_key(obj["Key"])
+        db.delete(ev)
+        deleted.append(ev.slug)
+    db.commit()
+
+    return {"deleted": deleted, "count": len(deleted)}
+
+
+# ---------------------------------------------------------------------------
+# Static assets
 # ---------------------------------------------------------------------------
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
