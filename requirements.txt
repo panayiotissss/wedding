@@ -6,6 +6,6 @@ itsdangerous==2.2.0
 python-multipart==0.0.9
 qrcode[pil]==7.4.2
 Pillow==10.4.0
-SQLAlchemy==2.0.31
+SQLAlchemy==2.0.54
 psycopg[binary]==3.2.13
 stripe==10.5.0
