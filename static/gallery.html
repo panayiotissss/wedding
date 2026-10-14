@@ -606,7 +606,8 @@
   // ── Download zip ────────────────────────────────────────────────────────
 
   downloadBtn.addEventListener("click", () => {
-    // The server builds the zip and sends it as a download.
+    // The server makes sure the zip exists in R2, then redirects to a
+    // presigned R2 link, so the bytes come straight from R2 (WED-9).
     // Using an anchor click keeps the browser's native download UI.
     const a = document.createElement("a");
     a.href = `${API}/download-zip`;
@@ -659,7 +660,7 @@
 
     lbCounter.textContent = `${lbIndex + 1} / ${allPhotos.length}`;
     lbCaption.textContent = `${photo.guest.replace(/_/g, " ")} · ${photo.filename}`;
-    lbDownload.href = photo.url;
+    lbDownload.href = photo.download_url || photo.url;
     lbDownload.download = photo.filename;
 
     lbPrev.disabled = lbIndex === 0;

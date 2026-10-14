@@ -13,6 +13,7 @@ Onboarding is self-serve + pay:
 (WED-2 multi-user, WED-7 pay-to-unlock).
 """
 
+import hashlib
 import io
 import re
 import uuid
@@ -22,7 +23,7 @@ from datetime import timedelta
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, field_validator
 from sqlalchemy.orm import Session
@@ -410,6 +411,7 @@ def list_photos(slug: str, request: Request, db: Session = Depends(get_db)):
             {
                 "key": obj["Key"],
                 "url": storage.presign_get(obj["Key"]),
+                "download_url": storage.presign_get(obj["Key"], download_as=parts[-1]),
                 "uploaded_at": obj["LastModified"].isoformat(),
                 "filename": parts[-1],
             }
@@ -419,63 +421,65 @@ def list_photos(slug: str, request: Request, db: Session = Depends(get_db)):
 
 
 # ---------------------------------------------------------------------------
-# Gallery — download all as ZIP (PROTECTED, streamed)
+# Gallery — download all as ZIP (PROTECTED, served from R2)
 # ---------------------------------------------------------------------------
+
+ZIP_NAME = "wedding_photos.zip"
+
+
+def _photos_signature(objects: list[dict]) -> str:
+    """Fingerprint of the current photo set; changes on any upload or delete."""
+    h = hashlib.sha256()
+    for o in sorted(objects, key=lambda o: o["Key"]):
+        h.update(f"{o['Key']}|{o.get('ETag', '')}\n".encode())
+    return h.hexdigest()[:32]
+
+
+def _build_zip(objects: list[dict], prefix: str, zip_key: str, sig: str) -> None:
+    """Copy every photo into one zip object in R2 (multipart, streamed)."""
+    writer = storage.MultipartWriter(zip_key, "application/zip", metadata={"sig": sig})
+    try:
+        with zipfile.ZipFile(writer, "w", zipfile.ZIP_STORED) as zf:
+            for obj in objects:
+                rel = obj["Key"][len(prefix):]
+                parts = rel.split("/")
+                guest = parts[0] if len(parts) > 1 else "guest"
+                zinfo = zipfile.ZipInfo(f"{guest}/{parts[-1]}")
+                zinfo.compress_type = zipfile.ZIP_STORED
+                with zf.open(zinfo, mode="w", force_zip64=True) as dest:
+                    body = storage.get_body(obj["Key"])
+                    for chunk in body.iter_chunks(chunk_size=1024 * 1024):
+                        dest.write(chunk)
+        writer.complete()
+    except BaseException:
+        writer.abort()
+        raise
+
 
 @app.get("/api/e/{slug}/download-zip")
 def download_zip(slug: str, request: Request, db: Session = Depends(get_db)):
+    """WED-9: the browser downloads the zip straight from R2.
+
+    The zip is built once into R2 under exports/ and reused until the photo set
+    changes, then we redirect to a short-lived presigned link. The couple's
+    download no longer streams through this server.
+    """
     ev = get_event_or_404(db, slug)
     require_event_auth(request, slug)
-    prefix = storage.photos_prefix(_storage_key(ev))
+    key = _storage_key(ev)
+    prefix = storage.photos_prefix(key)
+    zip_key = storage.exports_prefix(key) + ZIP_NAME
 
-    class _ChunkSink:
-        def __init__(self):
-            self._parts: list[bytes] = []
+    objects = storage.list_prefix(prefix)
+    if not objects:
+        raise HTTPException(status_code=404, detail="No photos yet")
 
-        def write(self, data: bytes) -> int:
-            self._parts.append(data)
-            return len(data)
+    sig = _photos_signature(objects)
+    existing = storage.head(zip_key)
+    if not existing or existing.get("Metadata", {}).get("sig") != sig:
+        _build_zip(objects, prefix, zip_key, sig)
 
-        def flush(self) -> None:
-            pass
-
-        def drain(self) -> bytes:
-            data = b"".join(self._parts)
-            self._parts.clear()
-            return data
-
-    def generate():
-        objects = storage.list_prefix(prefix)
-        sink = _ChunkSink()
-        with zipfile.ZipFile(sink, "w", zipfile.ZIP_STORED) as zf:
-            for obj in objects:
-                key = obj["Key"]
-                rel = key[len(prefix):]
-                parts = rel.split("/")
-                guest = parts[0] if len(parts) > 1 else "guest"
-                filename = parts[-1]
-
-                zinfo = zipfile.ZipInfo(f"{guest}/{filename}")
-                zinfo.compress_type = zipfile.ZIP_STORED
-                with zf.open(zinfo, mode="w") as dest:
-                    body = storage.get_body(key)
-                    for chunk in body.iter_chunks(chunk_size=1024 * 1024):
-                        dest.write(chunk)
-                        out = sink.drain()
-                        if out:
-                            yield out
-                out = sink.drain()
-                if out:
-                    yield out
-        tail = sink.drain()
-        if tail:
-            yield tail
-
-    return StreamingResponse(
-        generate(),
-        media_type="application/zip",
-        headers={"Content-Disposition": 'attachment; filename="wedding_photos.zip"'},
-    )
+    return RedirectResponse(storage.presign_get(zip_key, download_as=ZIP_NAME), status_code=302)
 
 
 # ---------------------------------------------------------------------------
