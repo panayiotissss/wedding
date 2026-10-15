@@ -29,18 +29,23 @@
     .brand-full span { white-space: normal; overflow: visible; line-height: 1.1; }
     @media (max-width: 520px) { .brand-full { font-size: 1.2rem; } }
 
-    /* Select mode: tap photos to pick them, then "Delete N selected". */
-    body.selecting .photo-thumb::after {
-      content: ""; position: absolute; top: 7px; left: 7px; width: 22px; height: 22px; border-radius: 50%;
-      border: 2px solid #fff; background: rgba(43,36,32,.25); box-shadow: 0 1px 4px rgba(0,0,0,.25);
+    /* Selecting: tap a photo's circle to pick it; once anything is picked,
+       tapping a photo toggles it too. "Delete all" becomes "Delete N selected". */
+    .sel {
+      position: absolute; top: 6px; left: 6px; z-index: 2; width: 26px; height: 26px; border-radius: 50%;
+      border: 2px solid #fff; background: rgba(43,36,32,.28); box-shadow: 0 1px 4px rgba(0,0,0,.25);
+      color: #fff; font-size: .75rem; font-weight: 700; display: grid; place-items: center; cursor: pointer;
+      padding: 0; opacity: 0; transition: opacity .15s, background .15s;
     }
-    body.selecting .photo-thumb.selected::after {
-      content: "✓"; background: var(--accent); color: #fff; font-size: .75rem; font-weight: 700;
-      display: grid; place-items: center;
-    }
+    .photo-thumb:hover .sel, .photo-thumb:focus-within .sel, body.selecting .sel { opacity: 1; }
+    @media (hover: none) { .sel { opacity: .9; } }
+    .photo-thumb.selected .sel { background: var(--accent); opacity: 1; }
+    .photo-thumb.selected .sel::before { content: "✓"; }
     .photo-thumb.selected img, .photo-thumb.selected video { transform: scale(.9); border-radius: 8px; }
-    body.selecting .photo-thumb:hover img, body.selecting .photo-thumb:hover video { transform: none; }
-    body.selecting .photo-thumb.selected:hover img, body.selecting .photo-thumb.selected:hover video { transform: scale(.9); }
+    .photo-thumb.selected:hover img, .photo-thumb.selected:hover video { transform: scale(.9); }
+    .sel-all { margin-left: auto; background: none; border: 0; color: var(--accent); font-weight: 600; font-size: .85rem; cursor: pointer; padding: .25rem 0; }
+    #clearSel { display: none; }
+    body.selecting #clearSel { display: inline-flex; }
 
     .share-panel {
       display: flex; align-items: center; gap: 1.1rem; background: var(--surface); border: 1px solid var(--line);
@@ -135,10 +140,10 @@
       <div class="count" id="statsLabel">Loading…</div>
     </div>
     <div class="gal-tools">
-      <button class="btn btn-sm" id="downloadBtn">Download all</button>
       <button class="btn btn-ghost btn-sm" id="refreshBtn" title="Reload photos">↻ Refresh</button>
-      <button class="btn btn-ghost btn-sm" id="selectBtn" title="Pick photos to delete">Select</button>
+      <button class="btn btn-sm" id="downloadBtn">Download all</button>
       <button class="btn btn-danger btn-sm" id="deleteAllBtn" title="Delete every photo">Delete all</button>
+      <button class="btn btn-ghost btn-sm" id="clearSel" title="Clear selection">Clear selection</button>
     </div>
   </div>
 
@@ -189,6 +194,7 @@
   // ── State ──────────────────────────────────────────────────────────────
 
   let allPhotos = [];   // flat list: { url, key, filename, guest }
+  const selected = new Set();   // keys of photos picked for deletion
   let lbIndex   = 0;
 
   // Pull the couple's names for the header/title (WED-4 dynamic name)
@@ -364,6 +370,9 @@
     }
 
     galleryContent.innerHTML = "";
+    selected.clear();
+    document.body.classList.remove("selecting");
+    updateSelectionUI();
 
     // Jump-to-guest chips once there's more than one guest.
     if (groups.length > 1) {
@@ -389,7 +398,16 @@
       hdr.innerHTML = `
         <span class="guest-name">${escHtml(guest.replace(/_/g, " "))}</span>
         <span class="guest-count">${photos.length} photo${photos.length === 1 ? "" : "s"}</span>
+        <button class="sel-all" type="button">Select all</button>
       `;
+      const guestKeys = photos.map(p => p.key);
+      const selAll = hdr.querySelector(".sel-all");
+      selAll.dataset.keys = JSON.stringify(guestKeys);
+      selAll.addEventListener("click", () => {
+        const all = guestKeys.every(k => selected.has(k));
+        guestKeys.forEach(k => all ? selected.delete(k) : selected.add(k));
+        syncThumbs();
+      });
       section.appendChild(hdr);
 
       const grid = document.createElement("div");
@@ -424,6 +442,12 @@
         }
 
         thumb.dataset.key = photo.key;
+        const sel = document.createElement("button");
+        sel.className = "sel";
+        sel.type = "button";
+        sel.setAttribute("aria-label", "Select photo");
+        sel.addEventListener("click", e => { e.stopPropagation(); toggleSelect(photo.key); });
+        thumb.appendChild(sel);
         thumb.addEventListener("click",  () => onThumb(thumb, globalIdx));
         thumb.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") onThumb(thumb, globalIdx); });
         grid.appendChild(thumb);
@@ -453,37 +477,42 @@
     setTimeout(() => { downloadBtn.textContent = "Download all"; }, 5000);
   });
 
-  // ── Select mode (pick photos to delete) ─────────────────────────────────
-
-  const selectBtn = document.getElementById("selectBtn");
-  const selected  = new Set();
-  let selectMode  = false;
+  // ── Selecting photos (no mode: the circles are always there) ────────────
 
   function onThumb(thumb, idx) {
-    if (!selectMode) return openLightbox(idx);
-    const key = thumb.dataset.key;
-    if (selected.has(key)) selected.delete(key); else selected.add(key);
-    thumb.classList.toggle("selected", selected.has(key));
-    updateSelectionUI();
+    // While something is picked, tapping photos keeps picking; otherwise open it.
+    if (selected.size) return toggleSelect(thumb.dataset.key);
+    openLightbox(idx);
   }
 
-  function setSelectMode(on) {
-    selectMode = on;
-    document.body.classList.toggle("selecting", on);
-    if (!on) {
-      selected.clear();
-      document.querySelectorAll(".photo-thumb.selected").forEach(t => t.classList.remove("selected"));
-    }
+  function toggleSelect(key) {
+    if (selected.has(key)) selected.delete(key); else selected.add(key);
+    syncThumbs();
+  }
+
+  function clearSelection() {
+    selected.clear();
+    syncThumbs();
+  }
+
+  // Reflect `selected` on the thumbnails, per-guest buttons and toolbar.
+  function syncThumbs() {
+    document.querySelectorAll(".photo-thumb").forEach(t =>
+      t.classList.toggle("selected", selected.has(t.dataset.key)));
+    document.querySelectorAll(".sel-all").forEach(b => {
+      const keys = JSON.parse(b.dataset.keys || "[]");
+      b.textContent = keys.length && keys.every(k => selected.has(k)) ? "Deselect all" : "Select all";
+    });
+    document.body.classList.toggle("selecting", selected.size > 0);
     updateSelectionUI();
   }
 
   function updateSelectionUI() {
-    selectBtn.textContent = selectMode ? "Cancel" : "Select";
     deleteAllBtn.textContent = selected.size ? `Delete ${selected.size} selected` : "Delete all";
     deleteAllBtn.title = selected.size ? "Delete the selected photos" : "Delete every photo";
   }
 
-  selectBtn.addEventListener("click", () => setSelectMode(!selectMode));
+  document.getElementById("clearSel").addEventListener("click", clearSelection);
 
   async function deleteSelected() {
     const keys = [...selected];
@@ -508,7 +537,9 @@
       }
     }
     deleteAllBtn.disabled = false;
-    setSelectMode(false);
+    selected.clear();
+    document.body.classList.remove("selecting");
+    updateSelectionUI();
     if (allPhotos.length) rebuildGalleryFromState();
     else { renderGallery([]); statsLabel.textContent = "0 photos"; }
     if (failed) alert(`${failed} photo${failed === 1 ? "" : "s"} could not be deleted. Please try again.`);
