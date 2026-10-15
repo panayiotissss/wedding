@@ -19,6 +19,7 @@ pytest -q
 | Wrong access code | Rejected with a clear message, nothing saved |
 | Guest upload + gallery | Upload link lands in the event's own folder under `R2_KEY_ROOT`; wrong file types and oversize files are refused; the gallery groups photos by guest and needs the couple's login; delete refuses keys from other events |
 | Signup rules | Back from Stripe then using a code reuses the same signup; a paid email can't sign up twice; email login ignores case; weak passwords and bad emails are refused; the email domain check fails open when DNS is down |
+| Emails | Welcome email after a free code and after payment; forgot password sends a one-time link (works once, expires after 1 hour, rate-limited, same answer for unknown emails) |
 | Pages | All pages and the favicon load; no em dashes in any page |
 
 R2 and DNS are faked in the tests, so they never touch real storage.

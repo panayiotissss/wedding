@@ -16,13 +16,14 @@ Onboarding is self-serve + pay:
 import hashlib
 import io
 import re
+import secrets
 import uuid
 import zipfile
 from contextlib import asynccontextmanager
-from datetime import timedelta
+from datetime import timedelta, timezone
 from pathlib import Path
 
-from fastapi import Depends, FastAPI, HTTPException, Request, Response
+from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Request, Response
 from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, field_validator
@@ -32,9 +33,10 @@ from starlette.middleware.sessions import SessionMiddleware
 
 import config
 import emailcheck
+import mailer
 import payments
 import storage
-from db import Event, get_db, init_db, now_utc
+from db import Event, PasswordReset, get_db, init_db, now_utc
 from security import hash_password, verify_password
 
 
@@ -114,6 +116,23 @@ def _activate(ev: Event) -> None:
     ev.expires_at = ev.paid_at + timedelta(days=config.EVENT_TTL_DAYS)
 
 
+def _send_welcome(ev: Event) -> None:
+    """Welcome email with the gallery link and QR code (runs after the response)."""
+    if ev.contact_email:
+        base = config.PUBLIC_BASE_URL
+        mailer.welcome(ev.contact_email, ev.couple_names,
+                       f"{base}/e/{ev.slug}/gallery", f"{base}/e/{ev.slug}/qr.png")
+
+
+def check_password_rules(v: str) -> str:
+    """Signup and reset share these rules; mirrored in static/create.html."""
+    if len(v) < 8:
+        raise ValueError("Password must be at least 8 characters.")
+    if not re.search(r"[A-Za-z]", v) or not re.search(r"\d", v):
+        raise ValueError("Password needs at least one letter and one number.")
+    return v
+
+
 def _unique_slug(db: Session) -> str:
     for _ in range(10):
         slug = uuid.uuid4().hex[:8]
@@ -149,6 +168,16 @@ def success_page():
 @app.get("/login")
 def login_page():
     return FileResponse("static/login.html")
+
+
+@app.get("/forgot")
+def forgot_page():
+    return FileResponse("static/forgot.html")
+
+
+@app.get("/reset")
+def reset_page():
+    return FileResponse("static/reset.html")
 
 
 @app.get("/e/{slug}")
@@ -199,12 +228,7 @@ class CreateEventRequest(BaseModel):
     @field_validator("password")
     @classmethod
     def check_password(cls, v: str) -> str:
-        # Mirrored in static/create.html so the form can say why before submitting.
-        if len(v) < 8:
-            raise ValueError("Password must be at least 8 characters.")
-        if not re.search(r"[A-Za-z]", v) or not re.search(r"\d", v):
-            raise ValueError("Password needs at least one letter and one number.")
-        return v
+        return check_password_rules(v)
 
     @field_validator("email")
     @classmethod
@@ -213,7 +237,8 @@ class CreateEventRequest(BaseModel):
 
 
 @app.post("/api/events")
-def create_event(body: CreateEventRequest, request: Request, db: Session = Depends(get_db)):
+def create_event(body: CreateEventRequest, request: Request, background: BackgroundTasks,
+                 db: Session = Depends(get_db)):
     email = _normalize_email(body.email)
 
     # A valid comp code lets a friend skip payment even when Stripe is on.
@@ -260,6 +285,7 @@ def create_event(body: CreateEventRequest, request: Request, db: Session = Depen
     _activate(ev)
     db.add(ev)
     db.commit()
+    background.add_task(_send_welcome, ev)
     _grant_auth(request, ev.slug)
     request.session["last_slug"] = ev.slug
     return {"slug": ev.slug, "status": ev.status, "payment_url": f"/create/success?slug={ev.slug}"}
@@ -285,6 +311,77 @@ def email_login(body: EmailLoginRequest, request: Request, db: Session = Depends
     return {"slug": ev.slug}
 
 
+# ---------------------------------------------------------------------------
+# Forgot password (WED-21): emailed one-time link, valid for 1 hour
+# ---------------------------------------------------------------------------
+
+RESET_TTL = timedelta(hours=1)
+RESET_COOLDOWN = timedelta(seconds=60)
+
+
+def _hash_token(token: str) -> str:
+    return hashlib.sha256(token.encode()).hexdigest()
+
+
+def _aware(dt):
+    # SQLite hands back naive datetimes; Postgres keeps the timezone.
+    return dt if dt is None or dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+
+
+class ForgotRequest(BaseModel):
+    email: str
+
+
+@app.post("/api/password/forgot")
+def forgot_password(body: ForgotRequest, background: BackgroundTasks, db: Session = Depends(get_db)):
+    """Always answers the same way, so it can't be used to find out who has a gallery."""
+    email = _normalize_email(body.email)
+    ev = db.query(Event).filter(func.lower(Event.contact_email) == email).first()
+    if ev:
+        latest = (db.query(PasswordReset).filter(PasswordReset.event_id == ev.id)
+                  .order_by(PasswordReset.created_at.desc()).first())
+        # One email a minute per gallery, so the form can't be used to spam someone.
+        if not latest or now_utc() - _aware(latest.created_at) > RESET_COOLDOWN:
+            token = secrets.token_urlsafe(32)
+            db.add(PasswordReset(token_hash=_hash_token(token), event_id=ev.id,
+                                 expires_at=now_utc() + RESET_TTL))
+            db.commit()
+            background.add_task(mailer.password_reset, ev.contact_email,
+                                f"{config.PUBLIC_BASE_URL}/reset?token={token}")
+    return {"ok": True}
+
+
+class ResetRequest(BaseModel):
+    token: str
+    password: str
+
+    @field_validator("password")
+    @classmethod
+    def check_password(cls, v: str) -> str:
+        return check_password_rules(v)
+
+
+@app.post("/api/password/reset")
+def reset_password(body: ResetRequest, request: Request, db: Session = Depends(get_db)):
+    pr = db.query(PasswordReset).filter(PasswordReset.token_hash == _hash_token(body.token)).first()
+    if not pr or pr.used_at or _aware(pr.expires_at) < now_utc():
+        raise HTTPException(status_code=400,
+                            detail="This reset link has expired or was already used. Please request a new one.")
+    ev = db.query(Event).filter(Event.id == pr.event_id).first()
+    if not ev:
+        raise HTTPException(status_code=400, detail="This reset link is no longer valid.")
+
+    ev.password_hash = hash_password(body.password)
+    # Burn this link and any other open links for the same gallery.
+    for other in db.query(PasswordReset).filter(PasswordReset.event_id == ev.id,
+                                                 PasswordReset.used_at.is_(None)):
+        other.used_at = now_utc()
+    db.commit()
+    _grant_auth(request, ev.slug)
+    request.session["last_slug"] = ev.slug
+    return {"slug": ev.slug}
+
+
 @app.get("/api/my-latest")
 def my_latest(request: Request):
     """The gallery this browser session most recently created — lets the
@@ -299,7 +396,8 @@ def event_status(slug: str, db: Session = Depends(get_db)):
 
 
 @app.post("/api/stripe/webhook")
-async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
+async def stripe_webhook(request: Request, background: BackgroundTasks,
+                         db: Session = Depends(get_db)):
     if not config.PAYMENTS_ENABLED:
         raise HTTPException(status_code=404, detail="Payments not configured")
 
@@ -319,6 +417,7 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
                 _activate(ev)
                 ev.stripe_ref = session.get("id")
                 db.commit()
+                background.add_task(_send_welcome, ev)
 
     return {"received": True}
 

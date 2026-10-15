@@ -219,3 +219,101 @@ def test_no_em_dashes_in_pages():
     from pathlib import Path
     for page in Path("static").glob("*.html"):
         assert "—" not in page.read_text(encoding="utf-8"), page.name
+
+
+# ── Emails: welcome + forgot password (WED-21) ─────────────────────────────
+
+import mailer  # noqa: E402
+from datetime import timedelta  # noqa: E402
+from db import PasswordReset  # noqa: E402
+
+
+def _capture_emails(monkeypatch):
+    sent = []
+    monkeypatch.setattr(mailer, "send",
+                        lambda to, subject, html, text: sent.append(
+                            {"to": to, "subject": subject, "text": text}) or True)
+    return sent
+
+
+def _reset_token(sent):
+    import re
+    return re.search(r"token=([\w-]+)", sent[-1]["text"]).group(1)
+
+
+def test_welcome_email_after_free_code_and_after_payment(client, signup, monkeypatch):
+    sent = _capture_emails(monkeypatch)
+    signup(access_code="FREE-TEST")
+    assert sent[-1]["to"] == "sofia@example.com"
+    assert "/gallery" in sent[-1]["text"]
+
+    ev = _event(signup(email="other@example.com").json()["slug"])
+    assert len(sent) == 1  # nothing yet: unpaid
+    _stripe_webhook(client, _checkout_completed(ev.id))
+    assert sent[-1]["to"] == "other@example.com"
+
+
+def test_forgot_password_full_flow(client, signup, monkeypatch):
+    sent = _capture_emails(monkeypatch)
+    slug = signup(access_code="FREE-TEST").json()["slug"]
+    sent.clear()
+
+    assert client.post("/api/password/forgot", json={"email": "SOFIA@example.com"}).status_code == 200
+    assert sent and sent[-1]["subject"].startswith("Reset")
+    token = _reset_token(sent)
+
+    client.post(f"/api/e/{slug}/logout")
+    res = client.post("/api/password/reset", json={"token": token, "password": "NewPass2027"})
+    assert res.status_code == 200 and res.json()["slug"] == slug
+    assert client.get(f"/api/e/{slug}/me").json()["authenticated"]  # reset logs you back in
+
+    login = lambda pw: client.post("/api/login", json={"email": "sofia@example.com", "password": pw})
+    assert login("NewPass2027").status_code == 200
+    assert login("Wedding2026").status_code == 401
+
+    # Single use.
+    again = client.post("/api/password/reset", json={"token": token, "password": "Another2028"})
+    assert again.status_code == 400
+
+
+def test_forgot_password_unknown_email_looks_the_same(client, monkeypatch):
+    sent = _capture_emails(monkeypatch)
+    res = client.post("/api/password/forgot", json={"email": "nobody@example.com"})
+    assert res.status_code == 200 and res.json() == {"ok": True}
+    assert sent == []
+
+
+def test_reset_link_expires(client, signup, monkeypatch):
+    sent = _capture_emails(monkeypatch)
+    signup(access_code="FREE-TEST")
+    client.post("/api/password/forgot", json={"email": "sofia@example.com"})
+    token = _reset_token(sent)
+    with SessionLocal() as db:
+        pr = db.query(PasswordReset).first()
+        pr.expires_at = datetime.now(timezone.utc) - timedelta(minutes=1)
+        db.commit()
+    res = client.post("/api/password/reset", json={"token": token, "password": "NewPass2027"})
+    assert res.status_code == 400
+
+
+def test_reset_rejects_weak_password_and_bad_token(client, signup, monkeypatch):
+    sent = _capture_emails(monkeypatch)
+    signup(access_code="FREE-TEST")
+    client.post("/api/password/forgot", json={"email": "sofia@example.com"})
+    token = _reset_token(sent)
+    assert client.post("/api/password/reset", json={"token": token, "password": "short"}).status_code == 422
+    assert client.post("/api/password/reset", json={"token": "nope", "password": "NewPass2027"}).status_code == 400
+
+
+def test_forgot_password_is_rate_limited(client, signup, monkeypatch):
+    sent = _capture_emails(monkeypatch)
+    signup(access_code="FREE-TEST")
+    sent.clear()
+    for _ in range(3):
+        client.post("/api/password/forgot", json={"email": "sofia@example.com"})
+    assert len(sent) == 1
+
+
+def test_forgot_and_reset_pages_load(client):
+    assert client.get("/forgot").status_code == 200
+    assert client.get("/reset?token=x").status_code == 200

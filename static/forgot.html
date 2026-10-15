@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Forgot password · Confetti</title>
+  <meta name="theme-color" content="#FBF7F2" />
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="/static/favicon.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/app.css" />
+</head>
+<body>
+
+<header class="topbar">
+  <a href="/" class="brand"><img src="/static/favicon.svg" alt="" /><span>Confetti</span></a>
+  <nav class="nav"><a href="/login" class="nav-link">Log in</a></nav>
+</header>
+
+<main class="narrow" style="margin-top:3rem">
+  <div class="card">
+    <div id="formView">
+      <h1 class="page-title">Forgot your password?</h1>
+      <p class="page-sub">Enter the email you signed up with and we'll send you a link to choose a new one.</p>
+      <form id="form" novalidate>
+        <div class="field">
+          <label class="label" for="email">Email</label>
+          <input class="input" type="email" id="email" placeholder="you@example.com" autocomplete="email" inputmode="email" />
+        </div>
+        <button class="btn btn-lg btn-block" id="sendBtn" type="submit">Send reset link</button>
+        <div class="alert alert-error" id="error" role="alert"></div>
+      </form>
+    </div>
+    <div id="sentView" class="state" style="display:none;padding:1rem 0">
+      <span class="ico">📬</span>
+      <h2>Check your inbox</h2>
+      If that email has a gallery, we've sent a link to reset the password. It works for 1 hour.
+      <p class="foot-note">Nothing after a few minutes? Check your spam folder.</p>
+    </div>
+  </div>
+  <p class="foot-note"><a href="/login">Back to log in</a></p>
+</main>
+
+<script>
+  "use strict";
+  const emailEl = document.getElementById("email");
+  const btn = document.getElementById("sendBtn");
+  const errorEl = document.getElementById("error");
+
+  document.getElementById("form").addEventListener("submit", async e => {
+    e.preventDefault();
+    errorEl.classList.remove("show");
+    const email = emailEl.value.trim();
+    if (!email.includes("@")) { errorEl.textContent = "Please enter your email."; errorEl.classList.add("show"); return; }
+    btn.disabled = true;
+    btn.textContent = "Sending…";
+    try {
+      const res = await fetch("/api/password/forgot", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      if (!res.ok) throw new Error();
+      document.getElementById("formView").style.display = "none";
+      document.getElementById("sentView").style.display = "block";
+    } catch {
+      errorEl.textContent = "Something went wrong. Please try again.";
+      errorEl.classList.add("show");
+      btn.disabled = false;
+      btn.textContent = "Send reset link";
+    }
+  });
+</script>
+</body>
+</html>

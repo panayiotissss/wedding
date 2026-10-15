@@ -52,6 +52,18 @@ class Event(Base):
     expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
+class PasswordReset(Base):
+    """One-time password reset link. Only a hash of the token is stored, so a
+    database leak can't be used to reset anyone's password."""
+    __tablename__ = "password_resets"
+
+    token_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
+    event_id: Mapped[str] = mapped_column(String(36), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
 def _normalize_url(url: str) -> str:
     """Neon/Render hand out postgres:// URLs; SQLAlchemy + psycopg3 wants
     postgresql+psycopg://.  Normalize so either form in DATABASE_URL works."""

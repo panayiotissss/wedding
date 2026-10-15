@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Choose a new password · Confetti</title>
+  <meta name="theme-color" content="#FBF7F2" />
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="/static/favicon.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/app.css" />
+</head>
+<body>
+
+<header class="topbar">
+  <a href="/" class="brand"><img src="/static/favicon.svg" alt="" /><span>Confetti</span></a>
+</header>
+
+<main class="narrow" style="margin-top:3rem">
+  <div class="card">
+    <h1 class="page-title">Choose a new password</h1>
+    <p class="page-sub">At least 8 characters, with a letter and a number.</p>
+    <form id="form" novalidate>
+      <div class="field">
+        <label class="label" for="password">New password</label>
+        <div class="pw-wrap">
+          <input class="input" type="password" id="password" placeholder="At least 8 characters" autocomplete="new-password" />
+          <button type="button" class="pw-toggle" id="pwToggle">Show</button>
+        </div>
+      </div>
+      <button class="btn btn-lg btn-block" id="saveBtn" type="submit">Save and open my gallery</button>
+      <div class="alert alert-error" id="error" role="alert"></div>
+    </form>
+  </div>
+  <p class="foot-note"><a href="/forgot">Need a new link?</a></p>
+</main>
+
+<script>
+  "use strict";
+  const token = new URLSearchParams(location.search).get("token") || "";
+  const pwEl = document.getElementById("password");
+  const btn = document.getElementById("saveBtn");
+  const errorEl = document.getElementById("error");
+  function showError(msg) { errorEl.innerHTML = msg; errorEl.classList.add("show"); }
+
+  if (!token) showError('This link is incomplete. <a href="/forgot">Request a new one</a>.');
+
+  document.getElementById("pwToggle").addEventListener("click", e => {
+    const show = pwEl.type === "password";
+    pwEl.type = show ? "text" : "password";
+    e.target.textContent = show ? "Hide" : "Show";
+  });
+
+  document.getElementById("form").addEventListener("submit", async e => {
+    e.preventDefault();
+    errorEl.classList.remove("show");
+    const password = pwEl.value;
+    if (password.length < 8) return showError("Password must be at least 8 characters.");
+    if (!/[A-Za-z]/.test(password) || !/\d/.test(password)) return showError("Password needs at least one letter and one number.");
+    btn.disabled = true;
+    btn.textContent = "Saving…";
+    try {
+      const res = await fetch("/api/password/reset", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token, password }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) { location.href = `/e/${data.slug}/gallery`; return; }
+      const msg = Array.isArray(data.detail) ? (data.detail[0]?.msg || "").replace(/^Value error, /, "") : data.detail;
+      showError((msg || "Something went wrong.") + (res.status === 400 ? ' <a href="/forgot">Request a new link</a>.' : ""));
+    } catch {
+      showError("Network error. Please try again.");
+    }
+    btn.disabled = false;
+    btn.textContent = "Save and open my gallery";
+  });
+</script>
+</body>
+</html>
