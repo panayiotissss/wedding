@@ -3,130 +3,251 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Confetti Wedding Photo Sharing</title>
+  <title>Confetti · Wedding photo sharing with one QR code</title>
+  <meta name="description" content="Guests scan one QR code and every photo and video from your wedding lands in your private gallery. No app, no accounts. €25 one-time." />
+  <meta name="theme-color" content="#FBF7F2" />
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="/static/favicon.svg" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/app.css" />
   <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    :root {
-      --rose: #c9a9a6;
-      --rose-dark: #b89490;
-      --ink: #4a4442;
-      --serif: "Cormorant Garamond", Georgia, "Times New Roman", serif;
+    .hero {
+      max-width: 1080px; margin: 0 auto; padding: 2rem 1.25rem 3rem;
+      display: grid; gap: 2.5rem; align-items: center;
     }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, sans-serif;
-      background: linear-gradient(160deg, #faf8f5 0%, #f4ece6 100%);
-      background-attachment: fixed;
-      color: #4a4442;
-      min-height: 100vh;
+    @media (min-width: 900px) { .hero { grid-template-columns: 1.1fr .9fr; padding-top: 3.5rem; } }
+    .eyebrow {
+      display: inline-flex; align-items: center; gap: .45rem; font-size: .8rem; font-weight: 600;
+      color: var(--accent); background: var(--accent-soft); padding: .35rem .8rem; border-radius: 999px; margin-bottom: 1.1rem;
     }
-    header {
-      display: flex; justify-content: space-between; align-items: center;
-      padding: 1rem 1.5rem; max-width: 1000px; margin: 0 auto;
-    }
-    .brand { font-family: var(--serif); font-size: 1.6rem; font-weight: 600; color: var(--ink); }
-    .nav-cta {
-      font-size: 0.85rem; padding: 0.45rem 1.1rem; border-radius: 22px;
-      background: var(--rose); color: #fff; text-decoration: none; transition: background 0.15s;
-    }
-    .nav-cta:hover { background: var(--rose-dark); }
-
-    .hero { max-width: 720px; margin: 3.5rem auto 2rem; padding: 0 1.5rem; text-align: center; }
     .hero h1 {
-      font-family: var(--serif); font-weight: 700; color: var(--ink);
-      font-size: clamp(2.2rem, 6vw, 3.6rem); line-height: 1.1; margin-bottom: 1rem;
+      font-family: var(--serif); font-weight: 600; line-height: 1.02; letter-spacing: -.01em;
+      font-size: clamp(2.6rem, 7.5vw, 4.3rem); margin-bottom: 1.1rem;
     }
-    .hero p { font-size: 1.05rem; color: #8a7f78; max-width: 520px; margin: 0 auto 2rem; line-height: 1.6; }
-    .btn-primary {
-      display: inline-block; padding: 0.9rem 2rem; background: var(--rose); color: #fff;
-      text-decoration: none; border-radius: 10px; font-size: 1.05rem; font-weight: 500;
-      letter-spacing: 0.02em; transition: background 0.15s, transform 0.1s;
-      box-shadow: 0 4px 14px rgba(201,169,166,0.4);
-    }
-    .btn-primary:hover { background: var(--rose-dark); transform: translateY(-1px); }
-    .price-note { margin-top: 1rem; font-size: 0.85rem; color: #a79b94; }
+    .hero h1 em { font-style: italic; color: var(--accent); }
+    .hero .lede { font-size: 1.1rem; color: var(--ink-soft); max-width: 520px; margin-bottom: 1.75rem; }
+    .cta-row { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem 1.25rem; }
+    .price-tag { font-size: .92rem; color: var(--ink-soft); }
+    .price-tag strong { color: var(--ink); font-size: 1.05rem; }
+    .hero .trust { justify-content: flex-start; margin-top: 1.25rem; }
 
-    .steps {
-      max-width: 900px; margin: 3.5rem auto; padding: 0 1.5rem;
-      display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1.25rem;
+    /* Phone mockup of the guest page */
+    .phone-stage { position: relative; display: flex; justify-content: center; padding: 1rem 0; }
+    .phone {
+      width: 270px; border-radius: 40px; background: #1d1916; padding: 10px;
+      box-shadow: 0 30px 60px rgba(43,36,32,.22), 0 8px 18px rgba(43,36,32,.12);
+      transform: rotate(-3deg);
     }
-    .step {
-      background: #fff; border-radius: 12px; padding: 1.75rem 1.5rem;
-      box-shadow: 0 2px 12px rgba(0,0,0,0.05); text-align: center;
+    .screen { background: var(--bg); border-radius: 31px; overflow: hidden; padding: 26px 16px 18px; }
+    .screen .s-names { font-family: var(--serif); font-size: 1.55rem; font-weight: 600; text-align: center; line-height: 1.1; }
+    .screen .s-date { text-align: center; font-size: .68rem; color: var(--muted); letter-spacing: .14em; text-transform: uppercase; margin: .35rem 0 1rem; }
+    .screen .s-btn { background: var(--accent); color: #fff; border-radius: 999px; text-align: center; font-size: .8rem; font-weight: 600; padding: .7rem; margin-bottom: .9rem; }
+    .s-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+    .s-grid div { aspect-ratio: 1; border-radius: 6px; }
+    .s-progress { height: 5px; border-radius: 4px; background: var(--line); margin: .8rem 0 .3rem; overflow: hidden; }
+    .s-progress i { display: block; height: 100%; width: 72%; background: var(--accent); border-radius: 4px; }
+    .s-cap { font-size: .65rem; color: var(--muted); display: flex; justify-content: space-between; }
+    .float-chip {
+      position: absolute; background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow);
+      border-radius: 14px; padding: .55rem .8rem; font-size: .78rem; font-weight: 600; display: flex; align-items: center; gap: .4rem;
+      z-index: 2; white-space: nowrap;
     }
-    .step .num {
-      font-family: var(--serif); font-size: 1.6rem; color: var(--rose);
-      width: 48px; height: 48px; line-height: 48px; border-radius: 50%;
-      background: #fdf0ef; margin: 0 auto 0.9rem; font-weight: 600;
-    }
-    .step h3 { font-family: var(--serif); font-size: 1.35rem; font-weight: 600; margin-bottom: 0.4rem; color: var(--ink); }
-    .step p { font-size: 0.9rem; color: #8a7f78; line-height: 1.5; }
+    .float-chip.qr { left: max(4px, calc(50% - 200px)); top: 16%; }
+    .float-chip.ok { right: max(4px, calc(50% - 200px)); bottom: 14%; color: var(--ok); }
 
-    .features { max-width: 720px; margin: 0 auto 3rem; padding: 0 1.5rem; }
-    .feature-row {
-      display: flex; align-items: flex-start; gap: 0.75rem; padding: 0.6rem 0;
-      font-size: 0.95rem; color: #6a615c;
+    section.block { max-width: 1080px; margin: 0 auto; padding: 3.5rem 1.25rem; }
+    .section-title { font-family: var(--serif); font-size: clamp(2rem, 5vw, 2.7rem); font-weight: 600; text-align: center; line-height: 1.1; margin-bottom: .6rem; }
+    .section-sub { text-align: center; color: var(--muted); max-width: 560px; margin: 0 auto 2.25rem; }
+
+    .steps { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+    .step { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-lg); padding: 1.6rem 1.4rem; }
+    .step .n {
+      width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; margin-bottom: .9rem;
+      background: var(--accent-soft); color: var(--accent); font-weight: 700;
     }
-    .feature-row .check { color: var(--rose); font-weight: 700; }
+    .step h3 { font-family: var(--serif); font-size: 1.45rem; font-weight: 600; margin-bottom: .3rem; }
+    .step p { color: var(--ink-soft); font-size: .95rem; }
 
-    .final-cta { text-align: center; padding: 2.5rem 1.5rem 4rem; }
-    .final-cta h2 { font-family: var(--serif); font-size: 2rem; font-weight: 600; margin-bottom: 1.25rem; color: var(--ink); }
+    .features { display: grid; gap: .9rem 2rem; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); max-width: 880px; margin: 0 auto; }
+    .feature { display: flex; gap: .8rem; align-items: flex-start; }
+    .feature .fi { flex-shrink: 0; width: 38px; height: 38px; border-radius: 12px; background: var(--surface); border: 1px solid var(--line); display: grid; place-items: center; font-size: 1.1rem; }
+    .feature h4 { font-size: .98rem; margin-bottom: .1rem; }
+    .feature p { font-size: .9rem; color: var(--ink-soft); }
 
-    footer { text-align: center; padding: 2rem 1.5rem; color: #b3a89f; font-size: 0.8rem; }
+    .price-card {
+      max-width: 520px; margin: 0 auto; text-align: center; background: var(--surface);
+      border: 1px solid var(--line); border-radius: 28px; box-shadow: var(--shadow); padding: 2.25rem 1.5rem;
+    }
+    .price-card .amount { font-family: var(--serif); font-size: 4rem; font-weight: 600; line-height: 1; }
+    .price-card .per { color: var(--muted); margin: .4rem 0 1.4rem; }
+    .price-card ul { list-style: none; text-align: left; max-width: 330px; margin: 0 auto 1.6rem; }
+    .price-card li { padding: .4rem 0; font-size: .95rem; color: var(--ink-soft); }
+    .price-card li::before { content: "✓"; color: var(--ok); font-weight: 700; margin-right: .6rem; }
+    .compare { font-size: .85rem; color: var(--muted); margin-top: 1rem; }
+
+    .faq { max-width: 720px; margin: 0 auto; }
+    .faq details { border-bottom: 1px solid var(--line); padding: 1.05rem .25rem; }
+    .faq summary { cursor: pointer; font-weight: 600; list-style: none; display: flex; justify-content: space-between; gap: 1rem; }
+    .faq summary::-webkit-details-marker { display: none; }
+    .faq summary::after { content: "+"; color: var(--accent); font-size: 1.3rem; line-height: 1; }
+    .faq details[open] summary::after { content: "−"; }
+    .faq details p { color: var(--ink-soft); margin-top: .6rem; font-size: .95rem; }
+
+    .final { text-align: center; }
+    .final .section-title { margin-bottom: 1.25rem; }
+
+    /* Sticky CTA on phones */
+    .mobile-cta {
+      position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; padding: .75rem 1rem calc(.75rem + env(safe-area-inset-bottom));
+      background: rgba(251,247,242,.94); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+      border-top: 1px solid var(--line); display: flex; align-items: center; gap: .75rem;
+      transform: translateY(110%); transition: transform .25s;
+    }
+    .mobile-cta.show { transform: none; }
+    .mobile-cta .mc-price { font-size: .85rem; color: var(--ink-soft); white-space: nowrap; }
+    .mobile-cta .mc-price strong { display: block; color: var(--ink); font-size: 1.05rem; }
+    .mobile-cta .btn { flex: 1; }
+    @media (min-width: 720px) { .mobile-cta { display: none; } }
+    @media (max-width: 719px) { .site-foot { padding-bottom: 6rem; } .nav .hide-sm { display: none; } }
   </style>
 </head>
 <body>
 
-<header>
-  <span class="brand">Confetti</span>
-  <span style="display:flex; gap:1rem; align-items:center;">
-    <a href="/login" style="font-size:0.85rem; color:var(--ink); text-decoration:none;">Log in</a>
-    <a href="/create" class="nav-cta">Create your gallery</a>
-  </span>
+<header class="topbar">
+  <a href="/" class="brand"><img src="/static/favicon.svg" alt="" /><span>Confetti</span></a>
+  <nav class="nav">
+    <a href="#how" class="nav-link hide-sm">How it works</a>
+    <a href="#pricing" class="nav-link hide-sm">Pricing</a>
+    <a href="/login" class="nav-link">Log in</a>
+    <a href="/create" class="btn btn-sm">Get started</a>
+  </nav>
 </header>
 
 <section class="hero">
-  <h1>Every photo from your big day, in one place.</h1>
-  <p>Your guests scan one QR code and their photos &amp; videos land straight in your private gallery. No app, no accounts, no chasing people for pictures afterward.</p>
-  <a href="/create" class="btn-primary">Create your wedding gallery</a>
-  <p class="price-note">€19 one-time fee</p>
-</section>
-
-<section class="steps">
-  <div class="step">
-    <div class="num">1</div>
-    <h3>Create &amp; pay</h3>
-    <p>Enter your names, pick a gallery password, and pay once. Your page unlocks instantly.</p>
+  <div>
+    <span class="eyebrow">📸 No app for guests to download</span>
+    <h1>Every photo from your wedding, <em>in one place.</em></h1>
+    <p class="lede">Put one QR code on your tables. Guests scan it and their photos and videos go straight into your private gallery. No apps, no accounts, no chasing people for pictures afterwards.</p>
+    <div class="cta-row">
+      <a href="/create" class="btn btn-lg" id="heroCta">Create your gallery</a>
+      <span class="price-tag"><strong>€25</strong> one-time · no subscription</span>
+    </div>
+    <div class="trust"><span>Ready in 1 minute</span><span>Full-quality files</span><span>Live for 1 year</span></div>
   </div>
-  <div class="step">
-    <div class="num">2</div>
-    <h3>Share your QR</h3>
-    <p>Print the QR code for your tables. Guests scan, add their name, and upload. No app needed.</p>
+
+  <div class="phone-stage" aria-hidden="true">
+    <div class="float-chip qr">▦ Scan to share</div>
+    <div class="phone">
+      <div class="screen">
+        <div class="s-names">Maria &amp; Nikos</div>
+        <div class="s-date">Share your photos</div>
+        <div class="s-btn">+ Add photos &amp; videos</div>
+        <div class="s-grid">
+          <div style="background:linear-gradient(135deg,#E9C9BE,#C98B7F)"></div>
+          <div style="background:linear-gradient(135deg,#F2DFC4,#E4B25A)"></div>
+          <div style="background:linear-gradient(135deg,#D9CFC6,#8C8077)"></div>
+          <div style="background:linear-gradient(135deg,#F6E7E3,#D7A79C)"></div>
+          <div style="background:linear-gradient(135deg,#C9B8A8,#7A6A5E)"></div>
+          <div style="background:linear-gradient(135deg,#EBD6C2,#B98A63)"></div>
+        </div>
+        <div class="s-progress"><i></i></div>
+        <div class="s-cap"><span>Uploading 18 photos</span><span>72%</span></div>
+      </div>
+    </div>
+    <div class="float-chip ok">✓ 248 photos collected</div>
   </div>
-  <div class="step">
-    <div class="num">3</div>
-    <h3>Keep everything</h3>
-    <p>Browse every photo in your private gallery and download them with a single click.</p>
+</section>
+
+<section class="block" id="how">
+  <h2 class="section-title">How it works</h2>
+  <p class="section-sub">Set up in a minute. Your guests don't need to install or sign up for anything.</p>
+  <div class="steps">
+    <div class="step">
+      <div class="n">1</div>
+      <h3>Create your gallery</h3>
+      <p>Enter your names, choose a password and pay once. Your gallery and QR code are ready straight away.</p>
+    </div>
+    <div class="step">
+      <div class="n">2</div>
+      <h3>Put the QR on your tables</h3>
+      <p>Print it on table cards, the menu or a sign. Guests scan, type their name and upload from their phone.</p>
+    </div>
+    <div class="step">
+      <div class="n">3</div>
+      <h3>Relive it all</h3>
+      <p>See every photo grouped by guest in your private gallery, and download everything in one click.</p>
+    </div>
   </div>
 </section>
 
-<section class="features">
-  <div class="feature-row"><span class="check">✓</span><span>Photos &amp; videos up to 500&nbsp;MB each.</span></div>
-  <div class="feature-row"><span class="check">✓</span><span>Private, password-protected gallery only you can see.</span></div>
-  <div class="feature-row"><span class="check">✓</span><span>Grouped by guest, viewable full-screen, downloadable in one click.</span></div>
-  <div class="feature-row"><span class="check">✓</span><span>Your gallery stays live for a full year, download whenever you want.</span></div>
+<section class="block">
+  <h2 class="section-title">Made for the big day</h2>
+  <p class="section-sub">Everything you need, nothing you don't.</p>
+  <div class="features">
+    <div class="feature"><div class="fi">🎥</div><div><h4>Photos and videos</h4><p>Up to 500&nbsp;MB per file, in original quality. Speeches and first dances included.</p></div></div>
+    <div class="feature"><div class="fi">🔒</div><div><h4>Private by default</h4><p>Only you can open the gallery, with your password. Guests can upload but can't browse.</p></div></div>
+    <div class="feature"><div class="fi">👥</div><div><h4>Grouped by guest</h4><p>See who took what. Perfect for thanking everyone afterwards.</p></div></div>
+    <div class="feature"><div class="fi">⬇️</div><div><h4>Download everything</h4><p>One click gets you a single zip of every photo and video.</p></div></div>
+    <div class="feature"><div class="fi">📱</div><div><h4>Works on any phone</h4><p>iPhone or Android, straight from the camera. Nothing to install.</p></div></div>
+    <div class="feature"><div class="fi">🗓️</div><div><h4>A full year to enjoy it</h4><p>Your gallery stays live for 12 months, plenty of time to download it all.</p></div></div>
+  </div>
 </section>
 
-<section class="final-cta">
-  <h2>Ready to capture it all?</h2>
-  <a href="/create" class="btn-primary">Create your wedding gallery</a>
+<section class="block" id="pricing">
+  <h2 class="section-title">One simple price</h2>
+  <p class="section-sub">Pay once. No subscription, no per-guest fees, no limits on photos.</p>
+  <div class="price-card">
+    <div class="amount">€25</div>
+    <div class="per">one-time, per wedding</div>
+    <ul>
+      <li>Unlimited guests and uploads</li>
+      <li>Photos and videos up to 500 MB each</li>
+      <li>Your own QR code, ready to print</li>
+      <li>Private, password-protected gallery</li>
+      <li>One-click download of everything</li>
+      <li>Live for 12 months</li>
+    </ul>
+    <a href="/create" class="btn btn-lg btn-block">Create your gallery</a>
+    <p class="compare">Popular wedding photo apps charge around €45 or more for the same thing.</p>
+  </div>
 </section>
 
-<footer>
-  Confetti · Made with ❤ for the people getting married.
+<section class="block">
+  <h2 class="section-title" style="margin-bottom:1.5rem">Questions</h2>
+  <div class="faq">
+    <details><summary>Do my guests need to download an app?</summary><p>No. They scan the QR code with their phone camera, type their name and pick photos. It works in any browser on iPhone and Android.</p></details>
+    <details><summary>Who can see the photos?</summary><p>Only you. The gallery is protected by the password you choose. Guests can add photos, but they can't see anyone else's.</p></details>
+    <details><summary>Are the photos compressed?</summary><p>No. Files are stored exactly as your guests' phones took them, in full quality.</p></details>
+    <details><summary>How long do we keep access?</summary><p>Your gallery stays live for 12 months after you create it. Download everything in one zip whenever you like before then.</p></details>
+    <details><summary>When should we set it up?</summary><p>Any time before the wedding. It takes about a minute, and you can test the QR code yourself straight away.</p></details>
+    <details><summary>Is it really a one-time payment?</summary><p>Yes. €25, once. No subscription and nothing to cancel.</p></details>
+  </div>
+</section>
+
+<section class="block final">
+  <h2 class="section-title">Don't miss a single moment.</h2>
+  <a href="/create" class="btn btn-lg">Create your gallery for €25</a>
+</section>
+
+<footer class="site-foot">
+  Confetti · Made with ❤ for the people getting married · <a href="/login">Couple log in</a>
 </footer>
 
+<div class="mobile-cta" id="mobileCta">
+  <div class="mc-price"><strong>€25</strong>one-time</div>
+  <a href="/create" class="btn">Create your gallery</a>
+</div>
+
+<script>
+  // Show the sticky phone CTA once the hero button has scrolled away.
+  const heroCta = document.getElementById("heroCta");
+  const mobileCta = document.getElementById("mobileCta");
+  if ("IntersectionObserver" in window) {
+    new IntersectionObserver(([e]) => mobileCta.classList.toggle("show", !e.isIntersecting))
+      .observe(heroCta);
+  }
+</script>
 </body>
 </html>

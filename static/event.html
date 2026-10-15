@@ -4,293 +4,116 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Share your photos</title>
+  <meta name="theme-color" content="#FBF7F2" />
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="/static/favicon.svg" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/app.css" />
   <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-    :root {
-      --rose: #c9a9a6;
-      --rose-dark: #b89490;
-      --ink: #4a4442;
-      --serif: "Cormorant Garamond", Georgia, "Times New Roman", serif;
+    main { max-width: 480px; margin: 0 auto; padding: 0 1rem 3rem; }
+    .welcome { text-align: center; padding: 2.25rem .5rem 1.5rem; }
+    .welcome .kicker { font-size: .72rem; letter-spacing: .18em; text-transform: uppercase; color: var(--muted); }
+    .welcome h1 {
+      font-family: var(--serif); font-weight: 600; font-size: clamp(2.4rem, 11vw, 3.2rem);
+      line-height: 1.05; margin: .4rem 0 .5rem; overflow-wrap: anywhere;
     }
-
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, sans-serif;
-      background: linear-gradient(160deg, #faf8f5 0%, #f4ece6 100%);
-      background-attachment: fixed;
-      color: #333;
-      min-height: 100vh;
-    }
-
-    header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 0.875rem 1.25rem;
-      background: #fff;
-      border-bottom: 1px solid #ede8e1;
-      position: sticky;
-      top: 0;
-      z-index: 10;
-    }
-    header .brand {
-      font-family: var(--serif);
-      font-size: 1.4rem;
-      font-weight: 500;
-      letter-spacing: 0.02em;
-      color: var(--ink);
-    }
-    .login-link {
-      font-size: 0.8rem;
-      padding: 0.35rem 0.85rem;
-      border: 1px solid #c9a9a6;
-      border-radius: 20px;
-      color: #c9a9a6;
-      text-decoration: none;
-      transition: background 0.15s;
-    }
-    .login-link:hover { background: #fdf0ef; }
-
-    main {
-      max-width: 440px;
-      margin: 2.5rem auto;
-      padding: 0 1rem;
-    }
-    .card {
-      background: #fff;
-      border-radius: 12px;
-      padding: 2rem 1.75rem;
-      box-shadow: 0 2px 12px rgba(0,0,0,0.06);
-    }
-    .card h1 {
-      font-family: var(--serif);
-      font-size: 2.1rem;
-      font-weight: 600;
-      text-align: center;
-      color: var(--ink);
-      margin-bottom: 0.15rem;
-    }
-    .subtitle {
-      text-align: center;
-      color: #a79b94;
-      font-size: 0.85rem;
-      margin-bottom: 1rem;
-    }
-    .divider {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 0.6rem;
-      color: var(--rose);
-      margin-bottom: 1.75rem;
-      font-size: 0.8rem;
-    }
-    .divider::before, .divider::after {
-      content: "";
-      height: 1px;
-      width: 44px;
-      background: linear-gradient(to var(--dir, right), transparent, #e3d3ce);
-    }
-    .divider::before { --dir: left; }
-
-    label {
-      display: block;
-      font-size: 0.8rem;
-      font-weight: 500;
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-      color: #888;
-      margin-bottom: 0.35rem;
-    }
-    input[type="text"] {
-      width: 100%;
-      padding: 0.65rem 0.85rem;
-      border: 1.5px solid #ddd;
-      border-radius: 8px;
-      font-size: 1rem;
-      outline: none;
-      transition: border-color 0.15s;
-      margin-bottom: 1.25rem;
-      background: #fdfcfb;
-    }
-    input[type="text"]:focus { border-color: #c9a9a6; }
+    .welcome p { color: var(--ink-soft); }
+    .ornament { color: var(--accent); margin-top: .75rem; letter-spacing: .5em; font-size: .8rem; }
 
     .drop-zone {
-      border: 2px dashed #ddd;
-      border-radius: 10px;
-      padding: 2rem 1rem;
-      text-align: center;
-      cursor: pointer;
-      position: relative;
-      transition: border-color 0.15s, background 0.15s;
-      margin-bottom: 1rem;
+      position: relative; display: block; text-align: center; cursor: pointer;
+      border: 2px dashed #DCCFC3; border-radius: 18px; padding: 1.6rem 1rem;
+      background: var(--bg); transition: border-color .15s, background .15s; margin-bottom: 1rem;
     }
-    .drop-zone.over, .drop-zone:hover {
-      border-color: #c9a9a6;
-      background: #fef8f7;
+    .drop-zone.over, .drop-zone:hover { border-color: var(--accent); background: var(--accent-soft); }
+    .drop-zone input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; font-size: 0; width: 100%; }
+    .dz-cta {
+      display: inline-flex; align-items: center; gap: .5rem; background: var(--accent); color: #fff;
+      border-radius: 999px; padding: .85rem 1.4rem; font-weight: 600; box-shadow: 0 6px 18px rgba(158,79,69,.22);
     }
-    .drop-zone input[type="file"] {
-      position: absolute;
-      inset: 0;
-      opacity: 0;
-      cursor: pointer;
-      font-size: 0;
-    }
-    .drop-zone .dz-icon { font-size: 2.25rem; margin-bottom: 0.5rem; }
-    .drop-zone .dz-primary { font-weight: 500; color: #555; font-size: 0.95rem; }
-    .drop-zone .dz-secondary { color: #aaa; font-size: 0.78rem; margin-top: 0.25rem; }
+    .dz-secondary { color: var(--muted); font-size: .8rem; margin-top: .6rem; }
 
-    .preview-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 6px;
-      margin-bottom: 1rem;
-    }
-    .preview-item {
-      position: relative;
-      aspect-ratio: 1;
-      border-radius: 6px;
-      overflow: hidden;
-      background: #f0ede9;
-    }
-    .preview-item img,
-    .preview-item video {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      display: block;
-    }
+    .preview-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 1rem; }
+    .preview-item { position: relative; aspect-ratio: 1; border-radius: 10px; overflow: hidden; background: var(--bg-deep); }
+    .preview-item img, .preview-item video { width: 100%; height: 100%; object-fit: cover; }
     .preview-badge {
-      position: absolute;
-      bottom: 0; left: 0; right: 0;
-      padding: 3px 5px;
-      font-size: 0.62rem;
-      text-align: center;
-      font-weight: 600;
-      letter-spacing: 0.03em;
-      transition: background 0.2s;
+      position: absolute; left: 6px; bottom: 7px; padding: 2px 7px; border-radius: 999px;
+      font-size: .64rem; font-weight: 600; color: #fff; max-width: calc(100% - 12px);
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
-    .badge-pending  { background: rgba(0,0,0,0.4);   color: #fff; }
-    .badge-uploading{ background: rgba(201,169,166,0.9); color: #fff; }
-    .badge-done     { background: rgba(76,175,80,0.85);  color: #fff; }
-    .badge-error    { background: rgba(211,47,47,0.85);  color: #fff; }
+    .badge-pending   { background: rgba(43,36,32,.55); }
+    .badge-uploading { background: rgba(158,79,69,.92); }
+    .badge-done      { background: rgba(47,125,79,.92); }
+    .badge-error     { background: rgba(163,58,47,.95); }
+    .preview-progress { position: absolute; left: 0; bottom: 0; height: 4px; width: 0%; background: var(--ok); transition: width .15s ease-out; }
 
-    /* Thin per-file bar along the bottom of each thumbnail. */
-    .preview-progress {
-      position: absolute;
-      bottom: 0; left: 0;
-      height: 3px;
-      width: 0%;
-      background: #7fbf82;
-      transition: width 0.15s ease-out;
-    }
-
-    /* Overall progress across all files. */
     .overall-progress { display: none; margin-bottom: 1rem; }
-    .overall-progress .op-label {
-      display: flex;
-      justify-content: space-between;
-      font-size: 0.78rem;
-      color: #888;
-      margin-bottom: 0.35rem;
-    }
-    .overall-progress .op-track {
-      height: 8px;
-      background: #ede8e1;
-      border-radius: 6px;
-      overflow: hidden;
-    }
-    .overall-progress .op-fill {
-      height: 100%;
-      width: 0%;
-      background: linear-gradient(90deg, #c9a9a6, #b89490);
-      border-radius: 6px;
-      transition: width 0.2s ease-out;
-    }
+    .op-label { display: flex; justify-content: space-between; font-size: .82rem; color: var(--ink-soft); margin-bottom: .35rem; font-weight: 500; }
+    .op-track { height: 8px; background: var(--line); border-radius: 6px; overflow: hidden; }
+    .op-fill { height: 100%; width: 0%; background: var(--accent); border-radius: 6px; transition: width .2s ease-out; }
 
-    .btn-upload {
-      display: block;
-      width: 100%;
-      padding: 0.8rem;
-      background: #c9a9a6;
-      color: #fff;
-      border: none;
-      border-radius: 8px;
-      font-size: 1rem;
-      font-weight: 500;
-      cursor: pointer;
-      transition: background 0.15s, opacity 0.15s;
-      letter-spacing: 0.02em;
-    }
-    .btn-upload:hover:not(:disabled) { background: #b89490; }
-    .btn-upload:disabled { opacity: 0.55; cursor: not-allowed; }
+    .toast { margin-top: 1rem; padding: .8rem 1rem; border-radius: 12px; font-size: .9rem; text-align: center; display: none; }
+    .toast.success { background: var(--ok-soft); color: var(--ok); }
+    .toast.error   { background: var(--err-soft); color: var(--err); }
+    .toast.info    { background: var(--bg-deep); color: var(--ink-soft); }
 
-    .toast {
-      margin-top: 1rem;
-      padding: 0.75rem 1rem;
-      border-radius: 8px;
-      font-size: 0.875rem;
-      text-align: center;
-      display: none;
-    }
-    .toast.success { background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; }
-    .toast.error   { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
-    .toast.info    { background: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe; }
-
-    .state-msg { text-align: center; padding: 2.5rem 1rem; color: #9a8f88; }
-    .state-msg .icon { font-size: 2.5rem; display: block; margin-bottom: 0.75rem; }
+    .privacy { text-align: center; font-size: .8rem; color: var(--muted); margin-top: 1rem; }
+    .couple-link { text-align: center; margin-top: 2rem; font-size: .82rem; color: var(--muted); }
+    .couple-link a { color: var(--muted); }
+    .made-with { text-align: center; margin-top: .6rem; font-size: .78rem; color: #B5AAA1; }
+    .made-with a { color: inherit; }
   </style>
 </head>
 <body>
 
-<header>
-  <span class="brand" id="brand">Wedding gallery</span>
-  <a href="#" id="loginLink" class="login-link">Couple login</a>
-</header>
-
 <main>
+  <div class="welcome">
+    <div class="kicker">Share your photos</div>
+    <h1 id="brand">&nbsp;</h1>
+    <p id="uploadSubtitle">Help us capture every moment of our day.</p>
+    <div class="ornament">✦ ✦ ✦</div>
+  </div>
+
   <!-- Active gallery: the upload form -->
   <div class="card" id="uploadCard" style="display:none">
-    <h1>Share your photos</h1>
-    <p class="subtitle" id="uploadSubtitle">Help us capture every moment of our special day</p>
-    <div class="divider">&#10084;</div>
-
-    <label for="guestName">Your name</label>
-    <input type="text" id="guestName" placeholder="e.g. Andreas Nikolaou"
-           autocomplete="name" autocorrect="off" spellcheck="false" />
-
-    <label>Photos &amp; videos</label>
-    <div class="drop-zone" id="dropZone">
-      <input type="file" id="fileInput" multiple accept="image/*,video/*" />
-      <div class="dz-icon">&#128247;</div>
-      <p class="dz-primary">Tap to choose or drag &amp; drop</p>
-      <p class="dz-secondary">Photos &amp; videos · up to 500 MB each</p>
+    <div class="field">
+      <label class="label" for="guestName">Your name</label>
+      <input class="input" type="text" id="guestName" placeholder="e.g. Eleni Georgiou"
+             autocomplete="name" autocorrect="off" spellcheck="false" />
+      <p class="hint">So the couple knows who took them.</p>
     </div>
+
+    <label class="drop-zone" id="dropZone">
+      <input type="file" id="fileInput" multiple accept="image/*,video/*" />
+      <span class="dz-cta">＋ Choose photos &amp; videos</span>
+      <p class="dz-secondary">Pick as many as you like · up to 500 MB each</p>
+    </label>
 
     <div class="preview-grid" id="previewGrid" style="display:none"></div>
 
     <div class="overall-progress" id="overallProgress">
-      <div class="op-label">
-        <span>Uploading…</span>
-        <span id="opPercent">0%</span>
-      </div>
+      <div class="op-label"><span>Uploading… please keep this page open</span><span id="opPercent">0%</span></div>
       <div class="op-track"><div class="op-fill" id="opFill"></div></div>
     </div>
 
-    <button class="btn-upload" id="uploadBtn" disabled>Choose photos first</button>
+    <button class="btn btn-lg btn-block" id="uploadBtn" disabled>Choose photos first</button>
 
     <div class="toast" id="toast"></div>
+    <p class="privacy">🔒 Only the couple can see what you upload.</p>
   </div>
 
   <!-- Inactive / not-found states -->
   <div class="card" id="stateCard" style="display:none">
-    <div class="state-msg" id="stateMsg"><span class="icon">⏳</span>Loading…</div>
+    <div class="state" id="stateMsg"><div class="spinner"></div>Loading…</div>
   </div>
+
+  <p class="couple-link">Are you the couple? <a href="#" id="loginLink">Open your gallery</a></p>
+  <p class="made-with">Made with <a href="/" target="_blank">Confetti</a></p>
 </main>
 
+<script src="/static/confetti.js"></script>
 <script>
   "use strict";
 
@@ -325,6 +148,12 @@
 
   loginLink.href = `/e/${SLUG}/gallery`;
 
+  // Remember the guest's name so a second batch later in the night is one tap.
+  try { nameInput.value = localStorage.getItem("confetti_guest_name") || ""; } catch {}
+  nameInput.addEventListener("change", () => {
+    try { localStorage.setItem("confetti_guest_name", nameInput.value.trim()); } catch {}
+  });
+
   // ── Boot: fetch this event's info (WED-4 name + WED-7 paywall gate) ───────
   (async () => {
     try {
@@ -332,9 +161,9 @@
       if (res.status === 404) return showState("💌", "This gallery link isn't valid. Please double-check with the couple.");
       const info = await res.json();
 
+      brand.textContent = info.names || "Our wedding";
       if (info.names) {
-        brand.textContent = info.names;
-        document.title = `Share your photos — ${info.names}`;
+        document.title = `Share your photos · ${info.names}`;
       }
 
       if (info.active) {
@@ -352,7 +181,7 @@
     if (icon === null) { stateCard.style.display = "none"; return; }
     uploadCard.style.display = "none";
     stateCard.style.display = "block";
-    stateMsg.innerHTML = `<span class="icon">${icon}</span>${text}`;
+    stateMsg.innerHTML = `<span class="ico">${icon}</span>${text}`;
   }
 
   // ── File selection ──────────────────────────────────────────────────────
@@ -412,7 +241,7 @@
 
     uploadBtn.disabled = false;
     const n = selectedFiles.length;
-    uploadBtn.textContent = `Upload ${n} photo${n === 1 ? "" : "s"}`;
+    uploadBtn.textContent = `Upload ${n} file${n === 1 ? "" : "s"}`;
     hideToast();
   }
 
@@ -454,6 +283,7 @@
     showOverall(true);
 
     let ok = 0, fail = 0, cursor = 0;
+    const failed = [];
 
     // Worker pool: each worker grabs the next file until the queue is drained.
     async function worker() {
@@ -465,6 +295,7 @@
         } catch (err) {
           console.error("Upload error for", selectedFiles[i] && selectedFiles[i].name, err);
           setBadge(i, "error", "✗ Failed");
+          failed.push(selectedFiles[i]);
           loadedBytes[i] = 0;
           updateOverall();
           fail++;
@@ -476,22 +307,30 @@
     await Promise.all(pool);
 
     showOverall(false);
-    uploadBtn.textContent = "Upload more";
-    uploadBtn.disabled = false;
+    // Keep only the failures queued, so a retry never duplicates what already
+    // arrived. On full success the button waits for a new selection.
+    selectedFiles = failed;
+    fileInput.value = "";
+    if (fail) renderPreviews();   // grid now shows just the files to retry
+    uploadBtn.disabled = fail === 0;
+    uploadBtn.textContent = fail
+      ? `Retry ${fail} failed upload${fail === 1 ? "" : "s"}`
+      : "Choose more photos above";
 
     if (fail === 0) {
-      showToast(`All ${ok} file${ok === 1 ? "" : "s"} uploaded! Thank you 🎉`, "success");
+      showToast(`All ${ok} file${ok === 1 ? "" : "s"} uploaded. Thank you! 🎉`, "success");
+      window.confettiBurst();
     } else if (ok === 0) {
       showToast(`All uploads failed. Check your connection and try again.`, "error");
     } else {
-      showToast(`${ok} uploaded, ${fail} failed. Tap "Upload more" to retry the failed ones.`, "info");
+      showToast(`${ok} uploaded, ${fail} failed. Tap "Retry" to try the failed ones again.`, "info");
     }
   });
 
   async function uploadOne(i, file) {
     setBadge(i, "uploading", "0%");
 
-    // Step 1 — presigned PUT URL from our server (validates type + size).
+    // Step 1: presigned PUT URL from our server (validates type + size).
     const res = await fetch(`${API}/upload-url`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -508,7 +347,7 @@
     }
     const { url } = await res.json();
 
-    // Step 2 — PUT straight to R2, with progress (XHR exposes upload progress; fetch doesn't).
+    // Step 2: PUT straight to R2, with progress (XHR exposes upload progress; fetch doesn't).
     await putWithProgress(url, file, (pct, loaded) => {
       loadedBytes[i] = loaded;
       setItemProgress(i, pct);

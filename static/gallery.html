@@ -3,356 +3,144 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Gallery</title>
+  <title>Gallery · Confetti</title>
+  <meta name="theme-color" content="#FBF7F2" />
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="/static/favicon.svg" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/app.css" />
   <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    .header-actions { display: flex; gap: .5rem; align-items: center; flex-shrink: 0; }
+    @media (max-width: 520px) { .hide-sm { display: none; } }
 
-    :root {
-      --rose: #c9a9a6;
-      --rose-dark: #b89490;
-      --ink: #4a4442;
-      --serif: "Cormorant Garamond", Georgia, "Times New Roman", serif;
-    }
+    /* Login */
+    #loginScreen { display: flex; align-items: center; justify-content: center; min-height: calc(100vh - 70px); padding: 2rem 1rem; }
+    #loginScreen .card { width: 100%; max-width: 400px; }
+    .login-error { margin-top: .9rem; padding: .7rem 1rem; border-radius: 12px; background: var(--err-soft); color: var(--err); font-size: .9rem; text-align: center; display: none; }
 
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, sans-serif;
-      background: linear-gradient(160deg, #faf8f5 0%, #f4ece6 100%);
-      background-attachment: fixed;
-      color: #333;
-      min-height: 100vh;
-    }
+    /* Gallery */
+    #galleryScreen { display: none; max-width: 1180px; margin: 0 auto; padding: 1.25rem 1rem 4rem; }
+    .gal-head { display: flex; align-items: flex-end; justify-content: space-between; flex-wrap: wrap; gap: .75rem; margin: .5rem 0 1.25rem; }
+    .gal-head h1 { font-family: var(--serif); font-size: clamp(2rem, 6vw, 2.8rem); font-weight: 600; line-height: 1.05; }
+    .count { color: var(--muted); font-size: .95rem; margin-top: .25rem; }
+    .gal-tools { display: flex; gap: .5rem; flex-wrap: wrap; }
 
-    /* ── Header ── */
-    header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 0.875rem 1.25rem;
-      background: #fff;
-      border-bottom: 1px solid #ede8e1;
-      position: sticky;
-      top: 0;
-      z-index: 20;
-    }
-    header .brand { font-family: var(--serif); font-size: 1.4rem; font-weight: 500; letter-spacing: 0.02em; color: var(--ink); }
-    .header-actions { display: flex; gap: 0.5rem; align-items: center; }
-    .btn-sm {
-      font-size: 0.8rem;
-      padding: 0.35rem 0.85rem;
-      border-radius: 20px;
-      cursor: pointer;
-      border: 1px solid;
-      text-decoration: none;
-      transition: background 0.15s;
-    }
-    .btn-outline {
-      border-color: #c9a9a6;
-      color: #c9a9a6;
-      background: transparent;
-    }
-    .btn-outline:hover { background: #fdf0ef; }
-    .btn-solid {
-      border-color: #c9a9a6;
-      background: #c9a9a6;
-      color: #fff;
-    }
-    .btn-solid:hover { background: #b89490; border-color: #b89490; }
-    .btn-danger {
-      border-color: #e0a0a0;
-      color: #c0605e;
-      background: transparent;
-    }
-    .btn-danger:hover { background: #fef2f2; }
-
-    /* ── Login screen ── */
-    #loginScreen {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      min-height: calc(100vh - 57px);
-      padding: 2rem 1rem;
-    }
-    .login-card {
-      background: #fff;
-      border-radius: 12px;
-      padding: 2.5rem 2rem;
-      box-shadow: 0 2px 12px rgba(0,0,0,0.06);
-      width: 100%;
-      max-width: 360px;
-    }
-    .login-card h1 {
-      font-family: var(--serif);
-      font-size: 1.9rem;
-      font-weight: 600;
-      text-align: center;
-      color: var(--ink);
-      margin-bottom: 0.3rem;
-    }
-    .login-subtitle {
-      text-align: center;
-      color: #999;
-      font-size: 0.85rem;
-      margin-bottom: 1.75rem;
-    }
-    .field-label {
-      display: block;
-      font-size: 0.78rem;
-      font-weight: 500;
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-      color: #888;
-      margin-bottom: 0.35rem;
-    }
-    input[type="password"] {
-      width: 100%;
-      padding: 0.65rem 0.85rem;
-      border: 1.5px solid #ddd;
-      border-radius: 8px;
-      font-size: 1rem;
-      outline: none;
-      transition: border-color 0.15s;
-      margin-bottom: 1rem;
-      background: #fdfcfb;
-    }
-    input[type="password"]:focus { border-color: #c9a9a6; }
-    .btn-login {
-      display: block;
-      width: 100%;
-      padding: 0.8rem;
-      background: #c9a9a6;
-      color: #fff;
-      border: none;
-      border-radius: 8px;
-      font-size: 1rem;
-      font-weight: 500;
-      cursor: pointer;
-      transition: background 0.15s;
-      letter-spacing: 0.02em;
-    }
-    .btn-login:hover:not(:disabled) { background: #b89490; }
-    .btn-login:disabled { opacity: 0.55; cursor: not-allowed; }
-    .login-error {
-      margin-top: 0.75rem;
-      padding: 0.6rem 0.85rem;
-      background: #fef2f2;
-      color: #991b1b;
-      border: 1px solid #fecaca;
-      border-radius: 6px;
-      font-size: 0.85rem;
-      text-align: center;
-      display: none;
-    }
-
-    /* ── Gallery screen ── */
-    #galleryScreen { display: none; padding: 1.5rem 1.25rem 3rem; }
-
-    /* Share-with-guests panel */
     .share-panel {
-      display: flex; align-items: center; gap: 1rem;
-      background: #fff; border: 1px solid #ede8e1; border-radius: 12px;
-      padding: 1rem 1.25rem; margin-bottom: 1.5rem;
-      box-shadow: 0 2px 12px rgba(0,0,0,0.04);
+      display: flex; align-items: center; gap: 1.1rem; background: var(--surface); border: 1px solid var(--line);
+      border-radius: var(--radius-lg); padding: 1rem 1.1rem; margin-bottom: 1.5rem; box-shadow: var(--shadow);
     }
-    .share-panel .share-body { flex: 1; min-width: 0; }
-    .share-label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; color: #a79b94; margin-bottom: 0.4rem; }
-    .share-link {
-      display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;
-      font-size: 0.85rem; color: #6a615c; word-break: break-all;
+    .share-body { flex: 1; min-width: 0; }
+    .share-title { font-weight: 600; margin-bottom: .15rem; }
+    .share-sub { font-size: .85rem; color: var(--muted); margin-bottom: .6rem; }
+    .share-link code {
+      display: block; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: .45rem .7rem;
+      font-size: .8rem; color: var(--ink-soft); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
-    .share-link code { background: #fdfcfb; border: 1px solid #eee; border-radius: 6px; padding: 0.3rem 0.5rem; }
-    .share-actions { display: flex; gap: 0.5rem; margin-top: 0.6rem; flex-wrap: wrap; }
-    .share-actions button, .share-actions a {
-      font-size: 0.78rem; padding: 0.3rem 0.7rem; border-radius: 16px; cursor: pointer;
-      border: 1px solid #c9a9a6; color: #c9a9a6; background: transparent; text-decoration: none;
-    }
-    .share-actions button:hover, .share-actions a:hover { background: #fdf0ef; }
-    .share-qr { width: 96px; height: 96px; border-radius: 8px; border: 1px solid #ede8e1; flex-shrink: 0; }
-    @media (max-width: 480px) { .share-panel { flex-direction: column-reverse; align-items: stretch; } .share-qr { align-self: center; } }
+    .share-actions { display: flex; gap: .5rem; margin-top: .6rem; flex-wrap: wrap; }
+    .share-qr { width: 104px; height: 104px; border-radius: 12px; border: 1px solid var(--line); flex-shrink: 0; background: #fff; }
+    @media (max-width: 520px) { .share-qr { width: 84px; height: 84px; } }
 
-    .stats-bar {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 1.5rem;
-      flex-wrap: wrap;
-      gap: 0.5rem;
+    .chips { display: flex; gap: .45rem; overflow-x: auto; padding-bottom: .4rem; margin-bottom: 1.25rem; scrollbar-width: none; }
+    .chips::-webkit-scrollbar { display: none; }
+    .chip {
+      flex-shrink: 0; padding: .45rem .85rem; border-radius: 999px; font-size: .85rem; text-decoration: none;
+      background: var(--surface); border: 1px solid var(--line); color: var(--ink-soft); text-transform: capitalize;
     }
-    .stats-bar .count { font-size: 0.875rem; color: #888; }
+    .chip:hover { border-color: var(--accent); color: var(--accent); }
+    .chip b { color: var(--muted); font-weight: 500; margin-left: .25rem; }
 
-    /* Guest section */
-    .guest-section { margin-bottom: 2.5rem; }
-    .guest-header {
-      display: flex;
-      align-items: baseline;
-      gap: 0.5rem;
-      margin-bottom: 0.75rem;
-      padding-bottom: 0.5rem;
-      border-bottom: 1px solid #ede8e1;
-    }
-    .guest-name {
-      font-size: 1rem;
-      font-weight: 500;
-      color: #555;
-      text-transform: capitalize;
-      letter-spacing: 0.02em;
-    }
-    .guest-count { font-size: 0.78rem; color: #aaa; }
+    .guest-section { margin-bottom: 2.25rem; scroll-margin-top: 80px; }
+    .guest-header { display: flex; align-items: baseline; gap: .6rem; margin-bottom: .75rem; }
+    .guest-name { font-family: var(--serif); font-size: 1.5rem; font-weight: 600; text-transform: capitalize; }
+    .guest-count { font-size: .82rem; color: var(--muted); }
 
-    /* Photo grid */
-    .photo-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-      gap: 8px;
-    }
-    .photo-thumb {
-      aspect-ratio: 1;
-      border-radius: 6px;
-      overflow: hidden;
-      cursor: pointer;
-      background: #ede8e1;
-      position: relative;
-      transition: transform 0.12s;
-    }
-    .photo-thumb:hover { transform: scale(1.02); }
-    .photo-thumb img,
-    .photo-thumb video {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      display: block;
-    }
+    .photo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; }
+    @media (max-width: 520px) { .photo-grid { grid-template-columns: repeat(3, 1fr); gap: 3px; } }
+    .photo-thumb { aspect-ratio: 1; border-radius: 10px; overflow: hidden; cursor: pointer; background: var(--bg-deep); position: relative; }
+    @media (max-width: 520px) { .photo-thumb { border-radius: 4px; } }
+    .photo-thumb img, .photo-thumb video { width: 100%; height: 100%; object-fit: cover; transition: transform .25s; }
+    .photo-thumb:hover img, .photo-thumb:hover video { transform: scale(1.04); }
     .video-badge {
-      position: absolute;
-      top: 5px; right: 5px;
-      background: rgba(0,0,0,0.55);
-      color: #fff;
-      font-size: 0.65rem;
-      padding: 2px 5px;
-      border-radius: 4px;
+      position: absolute; top: 6px; right: 6px; background: rgba(43,36,32,.65); color: #fff;
+      font-size: .65rem; font-weight: 600; padding: 2px 7px; border-radius: 999px;
     }
 
-    /* Empty / loading states */
-    .state-msg {
-      text-align: center;
-      padding: 4rem 1rem;
-      color: #aaa;
-      font-size: 0.9rem;
-    }
-    .state-msg .icon { font-size: 2.5rem; display: block; margin-bottom: 0.5rem; }
+    .state-msg { text-align: center; padding: 4rem 1rem; color: var(--muted); }
+    .state-msg .icon { font-size: 2.4rem; display: block; margin-bottom: .6rem; }
 
-    /* ── Lightbox ── */
-    #lightbox {
-      display: none;
-      position: fixed;
-      inset: 0;
-      background: rgba(0,0,0,0.92);
-      z-index: 100;
-      align-items: center;
-      justify-content: center;
-      flex-direction: column;
-    }
+    /* Lightbox */
+    #lightbox { display: none; position: fixed; inset: 0; background: rgba(20,16,14,.95); z-index: 100; align-items: center; justify-content: center; flex-direction: column; padding: 1rem; }
     #lightbox.open { display: flex; }
-    #lightbox img,
-    #lightbox video {
-      max-width: 92vw;
-      max-height: 82vh;
-      border-radius: 4px;
-      object-fit: contain;
-    }
+    #lightbox img, #lightbox video { max-width: 94vw; max-height: 74vh; border-radius: 6px; object-fit: contain; }
     #lightbox video { background: #000; }
-
-    .lb-controls {
-      display: flex;
-      gap: 1rem;
-      margin-top: 1rem;
-      align-items: center;
-    }
+    .lb-controls { display: flex; gap: 1rem; margin-top: 1rem; align-items: center; }
     .lb-btn {
-      background: rgba(255,255,255,0.15);
-      border: none;
-      color: #fff;
-      border-radius: 6px;
-      padding: 0.45rem 1rem;
-      cursor: pointer;
-      font-size: 0.9rem;
-      transition: background 0.15s;
+      background: rgba(255,255,255,.14); border: none; color: #fff; border-radius: 999px; padding: .55rem 1.05rem;
+      cursor: pointer; font-size: .9rem; text-decoration: none; transition: background .15s;
     }
-    .lb-btn:hover { background: rgba(255,255,255,0.3); }
-    .lb-btn:disabled { opacity: 0.3; cursor: not-allowed; }
-    .lb-counter { color: rgba(255,255,255,0.6); font-size: 0.85rem; min-width: 70px; text-align: center; }
-    .lb-close {
-      position: absolute;
-      top: 1rem; right: 1rem;
-      background: none;
-      border: none;
-      color: #fff;
-      font-size: 1.75rem;
-      cursor: pointer;
-      line-height: 1;
-      opacity: 0.7;
-    }
-    .lb-close:hover { opacity: 1; }
-    .lb-caption { color: rgba(255,255,255,0.55); font-size: 0.78rem; margin-top: 0.5rem; }
-    .lb-download {
-      position: absolute;
-      bottom: 1rem; right: 1rem;
-    }
-    .lb-delete {
-      position: absolute;
-      bottom: 1rem; left: 1rem;
-      background: rgba(211,47,47,0.8);
-    }
-    .lb-delete:hover:not(:disabled) { background: rgba(211,47,47,1); }
+    .lb-btn:hover { background: rgba(255,255,255,.28); }
+    .lb-btn:disabled { opacity: .3; cursor: not-allowed; }
+    .lb-counter { color: rgba(255,255,255,.65); font-size: .85rem; min-width: 70px; text-align: center; }
+    .lb-close { position: absolute; top: .75rem; right: .75rem; width: 44px; height: 44px; border-radius: 50%; background: rgba(255,255,255,.12); border: none; color: #fff; font-size: 1.2rem; cursor: pointer; }
+    .lb-caption { color: rgba(255,255,255,.6); font-size: .8rem; margin-top: .6rem; text-transform: capitalize; text-align: center; }
+    .lb-bottom { display: flex; gap: .6rem; margin-top: 1rem; }
+    .lb-delete { background: rgba(163,58,47,.85); }
+    .lb-delete:hover:not(:disabled) { background: rgba(163,58,47,1); }
   </style>
 </head>
 <body>
 
-<header>
-  <span class="brand" id="brand">Gallery</span>
+<header class="topbar sticky">
+  <a href="/" class="brand"><img src="/static/favicon.svg" alt="" /><span id="brand">Gallery</span></a>
   <div class="header-actions" id="headerActions" style="display:none">
-    <button class="btn-sm btn-outline" id="refreshBtn" title="Reload photos">&#8635; Refresh</button>
-    <button class="btn-sm btn-solid"   id="downloadBtn">&#8595; Download all</button>
-    <button class="btn-sm btn-danger"  id="deleteAllBtn" title="Delete every photo">&#128465; Delete all</button>
-    <button class="btn-sm btn-danger"  id="logoutBtn">Logout</button>
+    <button class="btn btn-sm" id="downloadBtn">⬇ Download all</button>
+    <button class="btn btn-ghost btn-sm" id="logoutBtn">Log out</button>
   </div>
 </header>
 
 <!-- Login form -->
 <div id="loginScreen">
-  <div class="login-card">
-    <h1>Welcome back</h1>
-    <p class="login-subtitle">Enter the gallery password</p>
-
-    <label class="field-label" for="passwordInput">Password</label>
-    <input type="password" id="passwordInput" placeholder="••••••••" autocomplete="current-password" />
-
-    <button class="btn-login" id="loginBtn">Enter gallery</button>
+  <div class="card">
+    <h1 class="page-title">Your gallery</h1>
+    <p class="page-sub">Enter your gallery password to see your photos.</p>
+    <label class="label" for="passwordInput">Password</label>
+    <input class="input" type="password" id="passwordInput" placeholder="Gallery password" autocomplete="current-password" style="margin-bottom:1rem" />
+    <button class="btn btn-lg btn-block" id="loginBtn">Enter gallery</button>
     <div class="login-error" id="loginError">Wrong password. Try again.</div>
+    <p class="foot-note">Forgot which gallery? <a href="/login">Log in with your email</a></p>
   </div>
 </div>
 
 <!-- Gallery (shown after login) -->
 <div id="galleryScreen">
+  <div class="gal-head">
+    <div>
+      <h1 id="galTitle">Your photos</h1>
+      <div class="count" id="statsLabel">Loading…</div>
+    </div>
+    <div class="gal-tools">
+      <button class="btn btn-ghost btn-sm" id="refreshBtn" title="Reload photos">↻ Refresh</button>
+      <button class="btn btn-danger btn-sm" id="deleteAllBtn" title="Delete every photo">Delete all</button>
+    </div>
+  </div>
+
   <div class="share-panel">
     <div class="share-body">
-      <div class="share-label">Guest upload link — print the QR or share the link</div>
+      <div class="share-title">Invite guests to upload</div>
+      <div class="share-sub">Print the QR code or send them the link.</div>
       <div class="share-link"><code id="guestLink"></code></div>
       <div class="share-actions">
-        <button id="copyLink" type="button">Copy link</button>
-        <a id="downloadQr" download="wedding_qr.png">↓ Download QR</a>
+        <button class="btn btn-soft btn-sm" id="copyLink" type="button">Copy link</button>
+        <a class="btn btn-ghost btn-sm" id="downloadQr" download="wedding_qr.png">⬇ QR code</a>
       </div>
     </div>
     <img class="share-qr" id="galleryQr" alt="Guest upload QR code" />
   </div>
 
-  <div class="stats-bar">
-    <span class="count" id="statsLabel">Loading…</span>
-  </div>
   <div id="galleryContent">
-    <div class="state-msg"><span class="icon">⏳</span>Loading photos…</div>
+    <div class="state-msg"><div class="spinner"></div>Loading photos…</div>
   </div>
 </div>
 
@@ -369,8 +157,10 @@
     <button class="lb-btn" id="lbNext">Next &#8594;</button>
   </div>
 
-  <button class="lb-btn lb-delete" id="lbDelete">&#128465; Delete</button>
-  <a class="lb-btn lb-download" id="lbDownload" download>&#8595; Save this photo</a>
+  <div class="lb-bottom">
+    <a class="lb-btn" id="lbDownload" download>⬇ Save</a>
+    <button class="lb-btn lb-delete" id="lbDelete">Delete</button>
+  </div>
 </div>
 
 <script>
@@ -391,7 +181,8 @@
       const info = await (await fetch(`${API}/info`)).json();
       if (info && info.names) {
         document.getElementById("brand").textContent = info.names;
-        document.title = `Gallery — ${info.names}`;
+        document.getElementById("galTitle").textContent = info.names;
+        document.title = `Gallery · ${info.names}`;
       }
     } catch { /* keep default header */ }
   })();
@@ -440,7 +231,7 @@
   const lbDelete      = document.getElementById("lbDelete");
 
   // ── Boot: check session ────────────────────────────────────────────────
-  // On page load we ask /api/me — if authenticated we go straight to the gallery,
+  // On page load we ask /api/me: if authenticated we go straight to the gallery,
   // no password re-entry needed (session cookie is present).
 
   (async () => {
@@ -451,7 +242,7 @@
         showGallery();
         loadPhotos();
       }
-    } catch { /* network error — stay on login screen */ }
+    } catch { /* network error: stay on login screen */ }
   })();
 
   // ── Login ──────────────────────────────────────────────────────────────
@@ -507,7 +298,7 @@
     loginScreen.style.display   = "flex";
     loginBtn.disabled = false;
     loginBtn.textContent = "Enter gallery";
-    galleryContent.innerHTML = '<div class="state-msg"><span class="icon">⏳</span>Loading photos…</div>';
+    galleryContent.innerHTML = '<div class="state-msg"><div class="spinner"></div>Loading photos…</div>';
     allPhotos = [];
   });
 
@@ -516,7 +307,7 @@
   refreshBtn.addEventListener("click", loadPhotos);
 
   async function loadPhotos() {
-    galleryContent.innerHTML = '<div class="state-msg"><span class="icon">⏳</span>Loading photos…</div>';
+    galleryContent.innerHTML = '<div class="state-msg"><div class="spinner"></div>Loading photos…</div>';
     statsLabel.textContent = "Loading…";
     allPhotos = [];
 
@@ -546,15 +337,30 @@
 
   function renderGallery(groups) {
     if (!groups.length) {
-      galleryContent.innerHTML = '<div class="state-msg"><span class="icon">📷</span>No photos yet. Guests will start uploading soon!</div>';
+      galleryContent.innerHTML = '<div class="state-msg"><span class="icon">📷</span><b>No photos yet.</b><br>Share the QR code above and they will appear here as guests upload.</div>';
       return;
     }
 
     galleryContent.innerHTML = "";
 
-    groups.forEach(({ guest, photos }) => {
+    // Jump-to-guest chips once there's more than one guest.
+    if (groups.length > 1) {
+      const chips = document.createElement("nav");
+      chips.className = "chips";
+      groups.forEach(({ guest, photos }, gi) => {
+        const a = document.createElement("a");
+        a.className = "chip";
+        a.href = `#guest-${gi}`;
+        a.innerHTML = `${escHtml(guest.replace(/_/g, " "))}<b>${photos.length}</b>`;
+        chips.appendChild(a);
+      });
+      galleryContent.appendChild(chips);
+    }
+
+    groups.forEach(({ guest, photos }, gi) => {
       const section = document.createElement("div");
       section.className = "guest-section";
+      section.id = `guest-${gi}`;
 
       const hdr = document.createElement("div");
       hdr.className = "guest-header";
@@ -585,7 +391,7 @@
 
           const badge = document.createElement("span");
           badge.className = "video-badge";
-          badge.textContent = "VIDEO";
+          badge.textContent = "▶ Video";
           thumb.appendChild(badge);
         } else {
           const img = new Image();
@@ -619,9 +425,9 @@
     a.click();
     document.body.removeChild(a);
 
-    downloadBtn.textContent = "⏳ Preparing…";
-    // Re-enable after a few seconds (the download will start in background)
-    setTimeout(() => { downloadBtn.textContent = "↓ Download all"; }, 5000);
+    downloadBtn.textContent = "Preparing…";
+    // Reset after a few seconds (the download will start in background)
+    setTimeout(() => { downloadBtn.textContent = "⬇ Download all"; }, 5000);
   });
 
   // ── Delete all photos ───────────────────────────────────────────────────
@@ -711,7 +517,7 @@
   lbNext.addEventListener("click",  () => { if (lbIndex < allPhotos.length - 1) { lbIndex++; renderLbMedia(); } });
   lbDelete.addEventListener("click", deleteCurrent);
 
-  // ── Delete (couple only — this whole page is behind login) ────────────────
+  // ── Delete (couple only: this whole page is behind login) ────────────────
 
   async function deleteCurrent() {
     const photo = allPhotos[lbIndex];
@@ -748,7 +554,7 @@
       console.error(err);
     } finally {
       lbDelete.disabled = false;
-      lbDelete.innerHTML = "&#128465; Delete";
+      lbDelete.textContent = "Delete";
     }
   }
 

@@ -3,96 +3,98 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Your gallery is ready — Confetti</title>
+  <title>Your gallery is ready · Confetti</title>
+  <meta name="theme-color" content="#FBF7F2" />
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="/static/favicon.svg" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/app.css" />
   <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    :root { --rose: #c9a9a6; --rose-dark: #b89490; --ink: #4a4442;
-      --serif: "Cormorant Garamond", Georgia, "Times New Roman", serif; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, sans-serif;
-      background: linear-gradient(160deg, #faf8f5 0%, #f4ece6 100%);
-      background-attachment: fixed; color: #333; min-height: 100vh;
+    .stepper { display: flex; justify-content: center; gap: .5rem; margin-bottom: 1.25rem; font-size: .78rem; color: var(--muted); }
+    .stepper span { padding: .3rem .7rem; border-radius: 999px; background: var(--bg-deep); }
+    .stepper span.on { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+    .qr-card {
+      margin: 1.25rem auto; width: 240px; padding: 14px 14px 10px; border-radius: 20px;
+      background: #fff; border: 1px solid var(--line); text-align: center;
     }
-    header { padding: 1rem 1.5rem; max-width: 1000px; margin: 0 auto; }
-    .brand { font-family: var(--serif); font-size: 1.6rem; font-weight: 600; color: var(--ink); text-decoration: none; }
-
-    main { max-width: 460px; margin: 2rem auto 3rem; padding: 0 1rem; }
-    .card { background: #fff; border-radius: 12px; padding: 2.25rem 1.75rem; box-shadow: 0 2px 12px rgba(0,0,0,0.06); text-align: center; }
-    .card h1 { font-family: var(--serif); font-size: 2rem; font-weight: 600; color: var(--ink); margin-bottom: 0.4rem; }
-    .card .sub { color: #a79b94; font-size: 0.9rem; margin-bottom: 1.5rem; }
-
-    .qr-wrap { margin: 1.25rem auto; }
-    .qr-wrap img { width: 220px; height: 220px; border-radius: 8px; border: 1px solid #ede8e1; }
-
-    .link-box {
-      display: flex; align-items: center; gap: 0.5rem; background: #fdfcfb; border: 1.5px solid #eee;
-      border-radius: 8px; padding: 0.6rem 0.75rem; margin: 0.75rem 0; font-size: 0.85rem; word-break: break-all;
+    .qr-card img { width: 212px; height: 212px; margin: 0 auto; }
+    .qr-card .qr-names { font-family: var(--serif); font-size: 1.15rem; font-weight: 600; margin-top: .25rem; }
+    .qr-card .qr-cta { font-size: .72rem; color: var(--muted); letter-spacing: .08em; text-transform: uppercase; }
+    .actions { display: grid; gap: .6rem; margin-top: 1.25rem; }
+    .link-row {
+      display: flex; align-items: center; gap: .5rem; margin-top: .4rem;
+      background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: .55rem .55rem .55rem .85rem;
     }
-    .link-box a { color: var(--rose-dark); text-decoration: none; }
-
-    .btn { display: block; width: 100%; padding: 0.8rem; background: var(--rose); color: #fff;
-      border: none; border-radius: 8px; font-size: 1rem; font-weight: 500; cursor: pointer;
-      text-decoration: none; transition: background 0.15s; margin-top: 0.6rem; letter-spacing: 0.02em; }
-    .btn:hover { background: var(--rose-dark); }
-    .btn-outline { background: transparent; color: var(--rose-dark); border: 1.5px solid var(--rose); }
-    .btn-outline:hover { background: #fdf0ef; }
-
-    .waiting { padding: 3rem 1rem; color: #9a8f88; }
-    .spinner { font-size: 2.5rem; display: block; margin-bottom: 1rem; animation: spin 1.2s linear infinite; }
-    @keyframes spin { to { transform: rotate(360deg); } }
-    .section-label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: #b3a89f; margin: 1.5rem 0 0.4rem; text-align: left; }
+    .link-row code { flex: 1; min-width: 0; font-size: .82rem; color: var(--ink-soft); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .section-label { font-size: .8rem; font-weight: 600; color: var(--ink-soft); margin-top: 1.4rem; }
+    .next { margin-top: 1.5rem; padding-top: 1.25rem; border-top: 1px solid var(--line); }
+    .next ol { padding-left: 1.2rem; color: var(--ink-soft); font-size: .92rem; }
+    .next li { margin: .3rem 0; }
   </style>
 </head>
 <body>
 
-<header><a href="/" class="brand">Confetti</a></header>
+<header class="topbar">
+  <a href="/" class="brand"><img src="/static/favicon.svg" alt="" /><span>Confetti</span></a>
+</header>
 
-<main>
-  <div class="card" id="card">
-    <div class="waiting" id="waiting">
-      <span class="spinner">⏳</span>
+<main class="narrow">
+  <div class="stepper"><span>1 · Your details</span><span>2 · Payment</span><span class="on">3 · Your QR code</span></div>
+  <div class="card">
+    <div class="state" id="waiting">
+      <div class="spinner"></div>
       Confirming your payment…<br>This usually takes a few seconds.
     </div>
 
     <div id="ready" style="display:none">
-      <h1>You're all set! 🎉</h1>
-      <p class="sub" id="readySub">Your gallery is live.</p>
+      <h1 class="page-title">You're all set! 🎉</h1>
+      <p class="page-sub" id="readySub">Your gallery is live.</p>
 
-      <div class="qr-wrap"><img id="qrImg" alt="Your QR code" /></div>
-      <p class="sub">Print this QR code for your tables. Guests scan it to upload.</p>
-      <a class="btn btn-outline" id="qrDownload" download="wedding_qr.png">↓ Download QR code</a>
+      <div class="qr-card">
+        <img id="qrImg" alt="Your QR code" />
+        <div class="qr-cta">Scan to share your photos</div>
+        <div class="qr-names" id="qrNames"></div>
+      </div>
 
-      <div class="section-label">Guest upload page</div>
-      <div class="link-box"><a id="uploadLink" href="#" target="_blank"></a></div>
+      <div class="actions">
+        <a class="btn btn-soft btn-block" id="qrDownload" download="wedding_qr.png">⬇ Download QR code</a>
+        <a class="btn btn-block" id="openGallery" href="#">Open my gallery</a>
+      </div>
 
-      <div class="section-label">Your private gallery</div>
-      <div class="link-box"><a id="galleryLink" href="#" target="_blank"></a></div>
+      <div class="section-label">Guest upload link</div>
+      <div class="link-row"><code id="uploadLink"></code><button class="btn btn-ghost btn-sm" id="copyBtn" type="button">Copy</button></div>
 
-      <a class="btn" id="openGallery" href="#">Open my gallery</a>
+      <div class="next">
+        <div class="section-label" style="margin-top:0">What to do next</div>
+        <ol>
+          <li>Scan the QR yourself to test it.</li>
+          <li>Print it on table cards, menus or a welcome sign.</li>
+          <li>Open your gallery during and after the wedding to see photos arrive.</li>
+        </ol>
+      </div>
     </div>
   </div>
 </main>
 
+<script src="/static/confetti.js"></script>
 <script>
   "use strict";
   const params = new URLSearchParams(location.search);
-
   const waiting = document.getElementById("waiting");
   const ready   = document.getElementById("ready");
 
   let slug = params.get("slug");
 
-  // After a Stripe Payment Link, the return URL has no slug — recover the
+  // After a Stripe Payment Link, the return URL has no slug, so recover the
   // gallery this session just created.
   (async () => {
     if (!slug) {
       try { slug = (await (await fetch("/api/my-latest")).json()).slug; } catch {}
     }
     if (!slug) {
-      waiting.innerHTML = "We couldn't find your gallery. <a href='/create'>Start again</a>.";
+      waiting.innerHTML = "We couldn't find your gallery. <a href='/login'>Log in</a> or <a href='/create'>start again</a>.";
       return;
     }
     poll();
@@ -110,25 +112,28 @@
   }
 
   function showReady(info) {
-    const origin = location.origin;
-    const uploadUrl  = `${origin}/e/${slug}`;
-    const galleryUrl = `${origin}/e/${slug}/gallery`;
+    const uploadUrl  = `${location.origin}/e/${slug}`;
+    const galleryUrl = `${location.origin}/e/${slug}/gallery`;
 
-    document.getElementById("readySub").textContent =
-      info.names ? `${info.names} your gallery is live.` : "Your gallery is live.";
-
-    const qr = document.getElementById("qrImg");
-    qr.src = `/e/${slug}/qr.png`;
+    if (info.names) {
+      document.getElementById("readySub").textContent = `${info.names}, your gallery is live.`;
+      document.getElementById("qrNames").textContent = info.names;
+    }
+    document.getElementById("qrImg").src = `/e/${slug}/qr.png`;
     document.getElementById("qrDownload").href = `/e/${slug}/qr.png`;
-
-    const up = document.getElementById("uploadLink");
-    up.textContent = uploadUrl; up.href = uploadUrl;
-    const gl = document.getElementById("galleryLink");
-    gl.textContent = galleryUrl; gl.href = galleryUrl;
+    document.getElementById("uploadLink").textContent = uploadUrl;
     document.getElementById("openGallery").href = galleryUrl;
+
+    const copyBtn = document.getElementById("copyBtn");
+    copyBtn.addEventListener("click", async () => {
+      try { await navigator.clipboard.writeText(uploadUrl); copyBtn.textContent = "Copied!"; }
+      catch { copyBtn.textContent = "Copy failed"; }
+      setTimeout(() => { copyBtn.textContent = "Copy"; }, 1500);
+    });
 
     waiting.style.display = "none";
     ready.style.display = "block";
+    window.confettiBurst();
   }
 </script>
 </body>

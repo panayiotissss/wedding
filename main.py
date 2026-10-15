@@ -26,6 +26,7 @@ from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, field_validator
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from starlette.middleware.sessions import SessionMiddleware
 
@@ -129,6 +130,11 @@ def landing_page():
     return FileResponse("static/landing.html")
 
 
+@app.get("/favicon.ico", include_in_schema=False)
+def favicon():
+    return FileResponse("static/favicon.svg", media_type="image/svg+xml")
+
+
 @app.get("/create")
 def create_page():
     return FileResponse("static/create.html")
@@ -210,11 +216,18 @@ def create_event(body: CreateEventRequest, request: Request, db: Session = Depen
     email = _normalize_email(body.email)
 
     # Email is the login identifier, so it must be unique.
-    if db.query(Event).filter(Event.contact_email == email).first():
+    if db.query(Event).filter(func.lower(Event.contact_email) == email).first():
         raise HTTPException(
             status_code=409,
             detail="An account with this email already exists. Please log in instead.",
         )
+
+    # A valid comp code lets a friend skip payment even when Stripe is on.
+    code = (body.access_code or "").strip()
+    code_ok = bool(config.FREE_ACCESS_CODE) and code == config.FREE_ACCESS_CODE
+    if code and not code_ok and config.PAYMENTS_ENABLED:
+        # Say so, rather than silently sending them to checkout.
+        raise HTTPException(status_code=400, detail="That access code isn't valid.")
 
     slug = _unique_slug(db)
     ev = Event(
@@ -227,9 +240,6 @@ def create_event(body: CreateEventRequest, request: Request, db: Session = Depen
         # since two different couples can share the same names).
         storage_prefix=f"{slugify_names(body.couple_names)}-{slug}",
     )
-
-    # A valid comp code lets a friend skip payment even when Stripe is on.
-    code_ok = bool(config.FREE_ACCESS_CODE) and (body.access_code or "").strip() == config.FREE_ACCESS_CODE
 
     if config.PAYMENTS_ENABLED and not code_ok:
         db.add(ev)
@@ -257,7 +267,9 @@ def email_login(body: EmailLoginRequest, request: Request, db: Session = Depends
     """Couple login by the email + password collected at signup — so they can get
     back into their gallery from any device without needing the original link."""
     email = _normalize_email(body.email)
-    ev = db.query(Event).filter(Event.contact_email == email).first()
+    # lower() on both sides: rows created before emails were normalized can
+    # still hold mixed case.
+    ev = db.query(Event).filter(func.lower(Event.contact_email) == email).first()
     if not ev or not verify_password(body.password, ev.password_hash):
         raise HTTPException(status_code=401, detail="Wrong email or password")
     _grant_auth(request, ev.slug)

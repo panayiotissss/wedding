@@ -11,6 +11,8 @@ Optional:
     COOKIE_SECURE          ("false" only for local http://localhost testing)
     EVENT_TTL_DAYS         (default 365 — auto-delete window)
     ADMIN_TOKEN            (protects the cleanup endpoint)
+    R2_KEY_ROOT            (default "events"; staging uses "staging/events" so
+                            it can share the production bucket without overlap)
 
 Stripe (optional — if BOTH are unset the app runs in STUB mode where events
 unlock instantly without payment, so you can demo the flow end-to-end):
@@ -42,6 +44,8 @@ R2_ACCESS_KEY_ID     = _require("R2_ACCESS_KEY_ID")
 R2_SECRET_ACCESS_KEY = _require("R2_SECRET_ACCESS_KEY")
 R2_BUCKET            = _require("R2_BUCKET")
 R2_ENDPOINT          = _require("R2_ENDPOINT")
+# Top-level folder for all event media in the bucket.
+R2_KEY_ROOT          = (_optional("R2_KEY_ROOT", "events") or "events").strip("/")
 
 # ── App / sessions / db ────────────────────────────────────────────────────
 SESSION_SECRET  = _require("SESSION_SECRET")

@@ -2,8 +2,9 @@
 R2 (S3-compatible) storage helpers.
 
 WED-5: every event's media is isolated under its own key prefix
-    events/<event_id>/photos/<guest>/<uuid>-<filename>
+    <R2_KEY_ROOT>/<event_id>/photos/<guest>/<uuid>-<filename>
 so one cheap bucket serves all couples with no cross-event access.
+R2_KEY_ROOT is "events" in production and "staging/events" on staging.
 """
 
 import boto3
@@ -28,11 +29,11 @@ def event_root(key: str) -> str:
     `key` is the event's storage_prefix (human-readable) or, for older rows,
     its id — the caller decides via main._storage_key().
     """
-    return f"events/{key}/"
+    return f"{config.R2_KEY_ROOT}/{key}/"
 
 
 def photos_prefix(key: str) -> str:
-    return f"events/{key}/photos/"
+    return f"{config.R2_KEY_ROOT}/{key}/photos/"
 
 
 def presign_put(key: str, content_type: str, expires: int = 3600) -> str:
@@ -56,7 +57,7 @@ def presign_get(key: str, expires: int = 3600, download_as: str | None = None) -
 def exports_prefix(key: str) -> str:
     """Generated files (e.g. the gallery zip). Outside photos/ so the gallery
     never lists them; still under event_root so cleanup deletes them."""
-    return f"events/{key}/exports/"
+    return f"{config.R2_KEY_ROOT}/{key}/exports/"
 
 
 def head(key: str) -> dict | None:

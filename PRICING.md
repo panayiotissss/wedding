@@ -37,7 +37,7 @@ Competitors charge **$25–$200**, with the popular tier around **$49** one-time
 
 ## Recommendation
 
-- **Launch price: €15–€19, one-time, gallery live for 1 year.**
+- **Launch price: €25, one-time, gallery live for 1 year.** Raised from the €15–19 first proposed; still about half the ~$49 market.
   Undercuts the $49 market leader by ~60% — the "stupidly cheap" hook — while
   still ~€15 gross margin per sale.
 - **Break-even:** ~6 sales/year covers always-on hosting; everything after is profit.

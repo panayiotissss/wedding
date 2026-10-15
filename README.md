@@ -55,5 +55,5 @@ curl -X POST -H "X-Admin-Token: $ADMIN_TOKEN" https://<your-domain>/api/admin/cl
 ## Costs & pricing
 
 See [PRICING.md](PRICING.md) — marginal cost is ~€2–4 per wedding (R2 has zero
-egress fees), so a €15–19 one-time price undercuts the ~$49 market and still
+egress fees), so the €25 one-time price undercuts the ~$49 market and still
 profits.

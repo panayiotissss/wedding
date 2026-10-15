@@ -3,64 +3,44 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Log in — Confetti</title>
+  <title>Log in · Confetti</title>
+  <meta name="theme-color" content="#FBF7F2" />
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="/static/favicon.svg" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&display=swap" rel="stylesheet" />
-  <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    :root { --rose: #c9a9a6; --rose-dark: #b89490; --ink: #4a4442;
-      --serif: "Cormorant Garamond", Georgia, "Times New Roman", serif; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, sans-serif;
-      background: linear-gradient(160deg, #faf8f5 0%, #f4ece6 100%);
-      background-attachment: fixed; color: #333; min-height: 100vh;
-    }
-    header { padding: 1rem 1.5rem; max-width: 1000px; margin: 0 auto; }
-    .brand { font-family: var(--serif); font-size: 1.6rem; font-weight: 600; color: var(--ink); text-decoration: none; }
-
-    main { max-width: 400px; margin: 3rem auto; padding: 0 1rem; }
-    .card { background: #fff; border-radius: 12px; padding: 2.25rem 1.75rem; box-shadow: 0 2px 12px rgba(0,0,0,0.06); }
-    .card h1 { font-family: var(--serif); font-size: 2rem; font-weight: 600; text-align: center; color: var(--ink); margin-bottom: 0.15rem; }
-    .subtitle { text-align: center; color: #a79b94; font-size: 0.85rem; margin-bottom: 1.75rem; }
-
-    label { display: block; font-size: 0.78rem; font-weight: 500; text-transform: uppercase;
-      letter-spacing: 0.06em; color: #888; margin-bottom: 0.35rem; }
-    input { width: 100%; padding: 0.65rem 0.85rem; border: 1.5px solid #ddd; border-radius: 8px;
-      font-size: 1rem; outline: none; transition: border-color 0.15s; margin-bottom: 1.1rem; background: #fdfcfb; }
-    input:focus { border-color: #c9a9a6; }
-
-    .btn { display: block; width: 100%; padding: 0.85rem; background: var(--rose); color: #fff;
-      border: none; border-radius: 8px; font-size: 1.02rem; font-weight: 500; cursor: pointer;
-      transition: background 0.15s, opacity 0.15s; letter-spacing: 0.02em; margin-top: 0.3rem; }
-    .btn:hover:not(:disabled) { background: var(--rose-dark); }
-    .btn:disabled { opacity: 0.55; cursor: not-allowed; }
-
-    .error { margin-top: 0.9rem; padding: 0.6rem 0.85rem; background: #fef2f2; color: #991b1b;
-      border: 1px solid #fecaca; border-radius: 6px; font-size: 0.85rem; text-align: center; display: none; }
-    .foot-note { text-align: center; font-size: 0.82rem; color: #a79b94; margin-top: 1rem; }
-    .foot-note a { color: var(--rose-dark); }
-  </style>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/app.css" />
 </head>
 <body>
 
-<header><a href="/" class="brand">Confetti</a></header>
+<header class="topbar">
+  <a href="/" class="brand"><img src="/static/favicon.svg" alt="" /><span>Confetti</span></a>
+  <nav class="nav"><a href="/create" class="nav-link">Create a gallery</a></nav>
+</header>
 
-<main>
+<main class="narrow" style="margin-top:3rem">
   <div class="card">
-    <h1>Welcome back</h1>
-    <p class="subtitle">Log in to your gallery</p>
+    <h1 class="page-title">Welcome back</h1>
+    <p class="page-sub">Log in to see your photos.</p>
 
-    <label for="email">Email</label>
-    <input type="email" id="email" placeholder="you@example.com" autocomplete="email" />
-
-    <label for="password">Password</label>
-    <input type="password" id="password" placeholder="Your gallery password" autocomplete="current-password" />
-
-    <button class="btn" id="loginBtn">Log in</button>
-    <p class="foot-note">No gallery yet? <a href="/create">Create one</a></p>
-    <div class="error" id="error"></div>
+    <form id="form" novalidate>
+      <div class="field">
+        <label class="label" for="email">Email</label>
+        <input class="input" type="email" id="email" placeholder="you@example.com" autocomplete="email" inputmode="email" />
+      </div>
+      <div class="field">
+        <label class="label" for="password">Gallery password</label>
+        <div class="pw-wrap">
+          <input class="input" type="password" id="password" placeholder="Your gallery password" autocomplete="current-password" />
+          <button type="button" class="pw-toggle" id="pwToggle">Show</button>
+        </div>
+      </div>
+      <button class="btn btn-lg btn-block" id="loginBtn" type="submit">Log in</button>
+      <div class="alert alert-error" id="error" role="alert"></div>
+    </form>
   </div>
+  <p class="foot-note">No gallery yet? <a href="/create">Create one for €25</a></p>
 </main>
 
 <script>
@@ -70,13 +50,19 @@
   const btn     = document.getElementById("loginBtn");
   const errorEl = document.getElementById("error");
 
-  function showError(msg) { errorEl.textContent = msg; errorEl.style.display = "block"; }
+  function showError(msg) { errorEl.textContent = msg; errorEl.classList.add("show"); }
 
-  btn.addEventListener("click", login);
-  pwEl.addEventListener("keydown", e => { if (e.key === "Enter") login(); });
+  document.getElementById("pwToggle").addEventListener("click", e => {
+    const show = pwEl.type === "password";
+    pwEl.type = show ? "text" : "password";
+    e.target.textContent = show ? "Hide" : "Show";
+  });
 
-  async function login() {
-    errorEl.style.display = "none";
+  document.getElementById("form").addEventListener("submit", login);
+
+  async function login(e) {
+    e.preventDefault();
+    errorEl.classList.remove("show");
     const email = emailEl.value.trim();
     const password = pwEl.value;
     if (!email || !password) return showError("Enter your email and password.");
