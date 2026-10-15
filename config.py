@@ -56,6 +56,8 @@ COOKIE_SECURE   = (_optional("COOKIE_SECURE", "true") or "true").lower() != "fal
 # ── Business rules ─────────────────────────────────────────────────────────
 EVENT_TTL_DAYS = int(_optional("EVENT_TTL_DAYS", "365") or "365")
 ADMIN_TOKEN    = _optional("ADMIN_TOKEN")
+# How often the app deletes expired galleries and old unpaid sign-ups. 0 = off.
+CLEANUP_INTERVAL_HOURS = float(_optional("CLEANUP_INTERVAL_HOURS", "24") or "24")
 
 MAX_FILE_SIZE = 500 * 1024 * 1024  # 500 MB — fits longer phone videos (single PUT).
                                    # Raise further only once multipart upload is in place.

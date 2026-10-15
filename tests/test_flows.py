@@ -208,7 +208,7 @@ def test_email_check_fails_open_when_dns_is_down(signup, monkeypatch):
 # ── Pages ───────────────────────────────────────────────────────────────────
 
 def test_pages_and_favicon_load(client):
-    for path in ["/", "/create", "/login", "/create/success"]:
+    for path in ["/", "/create", "/login", "/create/success", "/terms", "/privacy"]:
         assert client.get(path).status_code == 200, path
     fav = client.get("/favicon.ico")
     assert fav.status_code == 200
@@ -317,3 +317,29 @@ def test_forgot_password_is_rate_limited(client, signup, monkeypatch):
 def test_forgot_and_reset_pages_load(client):
     assert client.get("/forgot").status_code == 200
     assert client.get("/reset?token=x").status_code == 200
+
+
+# ── Auto-delete (WED-6, promised in the Privacy Policy) ────────────────────
+
+def test_cleanup_deletes_expired_and_old_unpaid_only(client, signup, monkeypatch):
+    from datetime import timedelta
+    wiped = []
+    monkeypatch.setattr(storage, "delete_prefix", lambda prefix: wiped.append(prefix) or 0)
+
+    keep_paid = signup(access_code="FREE-TEST", email="keep@example.com").json()["slug"]
+    old_paid = signup(access_code="FREE-TEST", email="old@example.com").json()["slug"]
+    keep_unpaid = signup(email="fresh@example.com").json()["slug"]
+    old_unpaid = signup(email="stale@example.com").json()["slug"]
+
+    now = datetime.now(timezone.utc)
+    with SessionLocal() as db:
+        db.query(Event).filter(Event.slug == old_paid).first().expires_at = now - timedelta(days=1)
+        db.query(Event).filter(Event.slug == old_unpaid).first().created_at = now - timedelta(days=31)
+        db.commit()
+
+    assert client.post("/api/admin/cleanup").status_code == 401
+    res = client.post("/api/admin/cleanup", headers={"X-Admin-Token": "test-admin"})
+    assert sorted(res.json()["deleted"]) == sorted([old_paid, old_unpaid])
+    assert _event(keep_paid) and _event(keep_unpaid)
+    assert _event(old_paid) is None and _event(old_unpaid) is None
+    assert all(p.startswith("staging/events/") for p in wiped) and len(wiped) == 2

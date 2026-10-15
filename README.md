@@ -44,12 +44,16 @@ per-couple storage · **WED-6** auto-delete · **WED-7** pay-to-unlock.
 
 ## Auto-delete (WED-6)
 
-`POST /api/admin/cleanup` deletes every event past `expires_at` (paid_at +
-`EVENT_TTL_DAYS`, default 365) along with all its R2 objects. Protect it with
-`ADMIN_TOKEN` and call it on a schedule (Render Cron / GitHub Action):
+Once a day the app deletes, with all their R2 files:
+- galleries past `expires_at` (paid_at + `EVENT_TTL_DAYS`, default 365)
+- sign-ups that were never paid within 30 days
+
+This runs inside the app (`CLEANUP_INTERVAL_HOURS`, default 24, `0` turns it
+off), so no cron service is needed. Both rules are promised in the Privacy
+Policy (`/privacy`). To run it by hand:
 
 ```bash
-curl -X POST -H "X-Admin-Token: $ADMIN_TOKEN" https://<your-domain>/api/admin/cleanup
+curl -X POST -H "X-Admin-Token: $ADMIN_TOKEN" https://confettiwedding.net/api/admin/cleanup
 ```
 
 ## Costs & pricing

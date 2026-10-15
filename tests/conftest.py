@@ -30,6 +30,8 @@ os.environ.update({
     "STRIPE_WEBHOOK_SECRET": "whsec_test_secret",
     "FREE_ACCESS_CODE": "FREE-TEST",
     "EMAIL_DNS_CHECK": "false",
+    "CLEANUP_INTERVAL_HOURS": "0",
+    "ADMIN_TOKEN": "test-admin",
     "PUBLIC_BASE_URL": "http://testserver",
 })
 

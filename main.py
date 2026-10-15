@@ -13,8 +13,10 @@ Onboarding is self-serve + pay:
 (WED-2 multi-user, WED-7 pay-to-unlock).
 """
 
+import asyncio
 import hashlib
 import io
+import logging
 import re
 import secrets
 import uuid
@@ -36,8 +38,10 @@ import emailcheck
 import mailer
 import payments
 import storage
-from db import Event, PasswordReset, get_db, init_db, now_utc
+from db import Event, PasswordReset, SessionLocal, get_db, init_db, now_utc
 from security import hash_password, verify_password
+
+log = logging.getLogger("confetti")
 
 
 # ---------------------------------------------------------------------------
@@ -47,7 +51,32 @@ from security import hash_password, verify_password
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
+    task = asyncio.create_task(_cleanup_loop()) if config.CLEANUP_INTERVAL_HOURS > 0 else None
     yield
+    if task:
+        task.cancel()
+
+
+async def _cleanup_loop():
+    """Daily auto-delete (WED-6), run inside the app so no extra cron service
+    is needed. The first run waits a minute so startup stays fast."""
+    await asyncio.sleep(60)
+    while True:
+        try:
+            deleted = await asyncio.to_thread(_cleanup_once)
+            if deleted:
+                log.info("Cleanup deleted %d gallery(ies): %s", len(deleted), deleted)
+        except Exception:
+            log.exception("Cleanup failed")
+        await asyncio.sleep(config.CLEANUP_INTERVAL_HOURS * 3600)
+
+
+def _cleanup_once() -> list[str]:
+    db = SessionLocal()
+    try:
+        return run_cleanup(db)
+    finally:
+        db.close()
 
 
 app = FastAPI(docs_url=None, redoc_url=None, lifespan=lifespan)
@@ -168,6 +197,16 @@ def success_page():
 @app.get("/login")
 def login_page():
     return FileResponse("static/login.html")
+
+
+@app.get("/terms")
+def terms_page():
+    return FileResponse("static/terms.html")
+
+
+@app.get("/privacy")
+def privacy_page():
+    return FileResponse("static/privacy.html")
 
 
 @app.get("/forgot")
@@ -638,31 +677,36 @@ def delete_all_photos(slug: str, request: Request, db: Session = Depends(get_db)
 # Admin — auto-delete expired events (WED-6)
 # ---------------------------------------------------------------------------
 
-@app.post("/api/admin/cleanup")
-def cleanup(request: Request, db: Session = Depends(get_db)):
-    """Delete every event past its expiry, plus all its R2 objects.
+UNPAID_TTL = timedelta(days=30)
 
-    Protect with the ADMIN_TOKEN env var and call on a schedule (Render Cron /
-    external cron / GitHub Action):  curl -X POST -H 'X-Admin-Token: ...' /api/admin/cleanup
-    """
-    if not config.ADMIN_TOKEN or request.headers.get("x-admin-token") != config.ADMIN_TOKEN:
-        raise HTTPException(status_code=401, detail="Unauthorized")
 
+def run_cleanup(db: Session) -> list[str]:
+    """Delete galleries past their 12-month expiry and sign-ups never paid
+    within 30 days, with all their R2 files and reset links. Both promises are
+    in the Privacy Policy (static/privacy.html)."""
     now = now_utc()
-    expired = (
-        db.query(Event)
-        .filter(Event.expires_at.isnot(None), Event.expires_at < now)
-        .all()
-    )
+    expired = db.query(Event).filter(Event.expires_at.isnot(None), Event.expires_at < now).all()
+    unpaid = (db.query(Event)
+              .filter(Event.status == "pending_payment", Event.created_at < now - UNPAID_TTL)
+              .all())
 
     deleted: list[str] = []
-    for ev in expired:
-        for obj in storage.list_prefix(storage.event_root(_storage_key(ev))):
-            storage.delete_key(obj["Key"])
+    for ev in expired + unpaid:
+        storage.delete_prefix(storage.event_root(_storage_key(ev)))
+        db.query(PasswordReset).filter(PasswordReset.event_id == ev.id).delete()
         db.delete(ev)
         deleted.append(ev.slug)
     db.commit()
+    return deleted
 
+
+@app.post("/api/admin/cleanup")
+def cleanup(request: Request, db: Session = Depends(get_db)):
+    """Run the cleanup now. It also runs daily on its own (see _cleanup_loop).
+    Protected by ADMIN_TOKEN:  curl -X POST -H 'X-Admin-Token: ...' /api/admin/cleanup"""
+    if not config.ADMIN_TOKEN or request.headers.get("x-admin-token") != config.ADMIN_TOKEN:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    deleted = run_cleanup(db)
     return {"deleted": deleted, "count": len(deleted)}
 
 
