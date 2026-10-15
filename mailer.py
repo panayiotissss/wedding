@@ -53,7 +53,10 @@ def _layout(inner: str) -> str:
 <table width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:32px 16px">
 <table width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#fff;border:1px solid #EADFD5;border-radius:18px">
 <tr><td style="padding:32px 28px">
-<div style="font-family:Georgia,serif;font-size:22px;font-weight:600;margin-bottom:20px">Confetti</div>
+<table cellpadding="0" cellspacing="0" style="margin-bottom:22px"><tr>
+<td><img src="{config.PUBLIC_BASE_URL}/static/logo.png" width="36" height="36" alt="" style="display:block;border-radius:9px"></td>
+<td style="padding-left:10px;font-family:Georgia,serif;font-size:22px;font-weight:600">Confetti</td>
+</tr></table>
 {inner}
 </td></tr></table>
 <p style="color:#8C8077;font-size:12px;margin-top:16px">Confetti · Made with ❤ for the people getting married</p>
@@ -74,8 +77,7 @@ def welcome(to: str, names: str, gallery_url: str, qr_url: str) -> bool:
 <p style="color:#5C514A;line-height:1.55"><b>Your QR code:</b> print it on table cards, menus or a sign.
 Guests scan it and their photos land in your gallery.<br>
 <a href="{escape(qr_url)}" style="color:#9E4F45">Download your QR code</a></p>
-<p style="color:#5C514A;line-height:1.55"><b>Logging in:</b> use this email ({escape(to)}) and the password you chose.
-Forgot it? Use "Forgot password" on the log-in page.</p>""")
+<p style="color:#5C514A;line-height:1.55"><b>Logging in:</b> use this email ({escape(to)}) and the password you chose.</p>""")
     text = (f"Your gallery is ready, {names}!\n\nOpen your gallery: {gallery_url}\n"
             f"Download your QR code: {qr_url}\n\nLog in with {to} and the password you chose.")
     return send(to, "Your Confetti gallery is ready", html, text)

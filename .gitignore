@@ -19,3 +19,6 @@ Thumbs.db
 .vscode/
 .idea/
 .claude/
+
+# App images that are part of the site
+!static/*.png
