@@ -26,6 +26,21 @@
     .gal-head h1 { font-family: var(--serif); font-size: clamp(2rem, 6vw, 2.8rem); font-weight: 600; line-height: 1.05; }
     .count { color: var(--muted); font-size: .95rem; margin-top: .25rem; }
     .gal-tools { display: flex; gap: .5rem; flex-wrap: wrap; }
+    .brand-full span { white-space: normal; overflow: visible; line-height: 1.1; }
+    @media (max-width: 520px) { .brand-full { font-size: 1.2rem; } }
+
+    /* Select mode: tap photos to pick them, then "Delete N selected". */
+    body.selecting .photo-thumb::after {
+      content: ""; position: absolute; top: 7px; left: 7px; width: 22px; height: 22px; border-radius: 50%;
+      border: 2px solid #fff; background: rgba(43,36,32,.25); box-shadow: 0 1px 4px rgba(0,0,0,.25);
+    }
+    body.selecting .photo-thumb.selected::after {
+      content: "✓"; background: var(--accent); color: #fff; font-size: .75rem; font-weight: 700;
+      display: grid; place-items: center;
+    }
+    .photo-thumb.selected img, .photo-thumb.selected video { transform: scale(.9); border-radius: 8px; }
+    body.selecting .photo-thumb:hover img, body.selecting .photo-thumb:hover video { transform: none; }
+    body.selecting .photo-thumb.selected:hover img, body.selecting .photo-thumb.selected:hover video { transform: scale(.9); }
 
     .share-panel {
       display: flex; align-items: center; gap: 1.1rem; background: var(--surface); border: 1px solid var(--line);
@@ -93,9 +108,8 @@
 <body>
 
 <header class="topbar sticky">
-  <a href="/" class="brand"><img src="/static/favicon.svg" alt="" /><span id="brand">Gallery</span></a>
+  <a href="#" class="brand brand-full" id="brandLink" title="Back to top"><img src="/static/favicon.svg" alt="" /><span id="brand">Gallery</span></a>
   <div class="header-actions" id="headerActions" style="display:none">
-    <button class="btn btn-sm" id="downloadBtn">⬇ Download all</button>
     <button class="btn btn-ghost btn-sm" id="logoutBtn">Log out</button>
   </div>
 </header>
@@ -121,7 +135,9 @@
       <div class="count" id="statsLabel">Loading…</div>
     </div>
     <div class="gal-tools">
+      <button class="btn btn-sm" id="downloadBtn">Download all</button>
       <button class="btn btn-ghost btn-sm" id="refreshBtn" title="Reload photos">↻ Refresh</button>
+      <button class="btn btn-ghost btn-sm" id="selectBtn" title="Pick photos to delete">Select</button>
       <button class="btn btn-danger btn-sm" id="deleteAllBtn" title="Delete every photo">Delete all</button>
     </div>
   </div>
@@ -205,6 +221,12 @@
       setTimeout(() => { btn.textContent = "Copy link"; }, 1500);
     });
   })();
+
+  // The names in the header scroll back to the top instead of leaving the gallery.
+  document.getElementById("brandLink").addEventListener("click", e => {
+    e.preventDefault();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  });
 
   // ── DOM refs ───────────────────────────────────────────────────────────
 
@@ -401,8 +423,9 @@
           thumb.appendChild(img);
         }
 
-        thumb.addEventListener("click",  () => openLightbox(globalIdx));
-        thumb.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") openLightbox(globalIdx); });
+        thumb.dataset.key = photo.key;
+        thumb.addEventListener("click",  () => onThumb(thumb, globalIdx));
+        thumb.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") onThumb(thumb, globalIdx); });
         grid.appendChild(thumb);
       });
 
@@ -427,20 +450,81 @@
 
     downloadBtn.textContent = "Preparing…";
     // Reset after a few seconds (the download will start in background)
-    setTimeout(() => { downloadBtn.textContent = "⬇ Download all"; }, 5000);
+    setTimeout(() => { downloadBtn.textContent = "Download all"; }, 5000);
   });
+
+  // ── Select mode (pick photos to delete) ─────────────────────────────────
+
+  const selectBtn = document.getElementById("selectBtn");
+  const selected  = new Set();
+  let selectMode  = false;
+
+  function onThumb(thumb, idx) {
+    if (!selectMode) return openLightbox(idx);
+    const key = thumb.dataset.key;
+    if (selected.has(key)) selected.delete(key); else selected.add(key);
+    thumb.classList.toggle("selected", selected.has(key));
+    updateSelectionUI();
+  }
+
+  function setSelectMode(on) {
+    selectMode = on;
+    document.body.classList.toggle("selecting", on);
+    if (!on) {
+      selected.clear();
+      document.querySelectorAll(".photo-thumb.selected").forEach(t => t.classList.remove("selected"));
+    }
+    updateSelectionUI();
+  }
+
+  function updateSelectionUI() {
+    selectBtn.textContent = selectMode ? "Cancel" : "Select";
+    deleteAllBtn.textContent = selected.size ? `Delete ${selected.size} selected` : "Delete all";
+    deleteAllBtn.title = selected.size ? "Delete the selected photos" : "Delete every photo";
+  }
+
+  selectBtn.addEventListener("click", () => setSelectMode(!selectMode));
+
+  async function deleteSelected() {
+    const keys = [...selected];
+    const n = keys.length;
+    if (!confirm(`Delete ${n} selected photo${n === 1 ? "" : "s"}?\n\nThis permanently removes ${n === 1 ? "it" : "them"} and cannot be undone.`)) return;
+
+    deleteAllBtn.disabled = true;
+    deleteAllBtn.textContent = "Deleting…";
+    let failed = 0;
+    for (const key of keys) {
+      try {
+        const res = await fetch(`${API}/delete`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ key }),
+        });
+        if (!res.ok) throw new Error(`Server error ${res.status}`);
+        allPhotos = allPhotos.filter(p => p.key !== key);
+      } catch (err) {
+        failed++;
+        console.error(err);
+      }
+    }
+    deleteAllBtn.disabled = false;
+    setSelectMode(false);
+    if (allPhotos.length) rebuildGalleryFromState();
+    else { renderGallery([]); statsLabel.textContent = "0 photos"; }
+    if (failed) alert(`${failed} photo${failed === 1 ? "" : "s"} could not be deleted. Please try again.`);
+  }
 
   // ── Delete all photos ───────────────────────────────────────────────────
   // Double-confirmed because it can't be undone.
 
   deleteAllBtn.addEventListener("click", async () => {
+    if (selected.size) return deleteSelected();
     const total = allPhotos.length;
     if (total === 0) { alert("There are no photos to delete."); return; }
     if (!confirm(`Delete ALL ${total} photo${total === 1 ? "" : "s"}?\n\nThis permanently removes every photo and video in the gallery and cannot be undone.`)) return;
     if (!confirm("Are you absolutely sure? This is your last chance to cancel.")) return;
 
     deleteAllBtn.disabled = true;
-    const original = deleteAllBtn.innerHTML;
     deleteAllBtn.textContent = "Deleting…";
     try {
       const res = await fetch(`${API}/delete-all`, { method: "POST" });
@@ -463,7 +547,7 @@
       console.error(err);
     } finally {
       deleteAllBtn.disabled = false;
-      deleteAllBtn.innerHTML = original;
+      updateSelectionUI();
     }
   });
 

@@ -23,11 +23,6 @@
     .qr-card .qr-names { font-family: var(--serif); font-size: 1.15rem; font-weight: 600; margin-top: .25rem; }
     .qr-card .qr-cta { font-size: .72rem; color: var(--muted); letter-spacing: .08em; text-transform: uppercase; }
     .actions { display: grid; gap: .6rem; margin-top: 1.25rem; }
-    .link-row {
-      display: flex; align-items: center; gap: .5rem; margin-top: .4rem;
-      background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: .55rem .55rem .55rem .85rem;
-    }
-    .link-row code { flex: 1; min-width: 0; font-size: .82rem; color: var(--ink-soft); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .section-label { font-size: .8rem; font-weight: 600; color: var(--ink-soft); margin-top: 1.4rem; }
     .next { margin-top: 1.5rem; padding-top: 1.25rem; border-top: 1px solid var(--line); }
     .next ol { padding-left: 1.2rem; color: var(--ink-soft); font-size: .92rem; }
@@ -59,12 +54,9 @@
       </div>
 
       <div class="actions">
-        <a class="btn btn-soft btn-block" id="qrDownload" download="wedding_qr.png">⬇ Download QR code</a>
+        <a class="btn btn-soft btn-block" id="qrDownload" download="wedding_qr.png">Download QR code</a>
         <a class="btn btn-block" id="openGallery" href="#">Open my gallery</a>
       </div>
-
-      <div class="section-label">Guest upload link</div>
-      <div class="link-row"><code id="uploadLink"></code><button class="btn btn-ghost btn-sm" id="copyBtn" type="button">Copy</button></div>
 
       <div class="next">
         <div class="section-label" style="margin-top:0">What to do next</div>
@@ -112,7 +104,6 @@
   }
 
   function showReady(info) {
-    const uploadUrl  = `${location.origin}/e/${slug}`;
     const galleryUrl = `${location.origin}/e/${slug}/gallery`;
 
     if (info.names) {
@@ -121,15 +112,7 @@
     }
     document.getElementById("qrImg").src = `/e/${slug}/qr.png`;
     document.getElementById("qrDownload").href = `/e/${slug}/qr.png`;
-    document.getElementById("uploadLink").textContent = uploadUrl;
     document.getElementById("openGallery").href = galleryUrl;
-
-    const copyBtn = document.getElementById("copyBtn");
-    copyBtn.addEventListener("click", async () => {
-      try { await navigator.clipboard.writeText(uploadUrl); copyBtn.textContent = "Copied!"; }
-      catch { copyBtn.textContent = "Copy failed"; }
-      setTimeout(() => { copyBtn.textContent = "Copy"; }, 1500);
-    });
 
     waiting.style.display = "none";
     ready.style.display = "block";

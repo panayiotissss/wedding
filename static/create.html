@@ -21,6 +21,19 @@
     }
     .preview-name:empty { display: none; }
     #codeField { display: none; }
+    .req { color: var(--accent); }
+    .meter { display: flex; gap: 4px; margin-top: .5rem; }
+    .meter i { flex: 1; height: 4px; border-radius: 4px; background: var(--line); transition: background .2s; }
+    .meter[data-score="1"] i:nth-child(-n+1) { background: #C9573F; }
+    .meter[data-score="2"] i:nth-child(-n+2) { background: #D99A3B; }
+    .meter[data-score="3"] i:nth-child(-n+3) { background: #7BA05B; }
+    .meter[data-score="4"] i { background: var(--ok); }
+    .rules { list-style: none; display: flex; flex-wrap: wrap; gap: .2rem .9rem; margin-top: .45rem; font-size: .78rem; color: var(--muted); }
+    .rules li::before { content: "○ "; }
+    .rules li.ok { color: var(--ok); }
+    .rules li.ok::before { content: "✓ "; }
+    .suggest { font-size: .82rem; margin-top: .35rem; color: var(--ink-soft); display: none; }
+    .suggest button { background: none; border: 0; color: var(--accent); font-weight: 600; cursor: pointer; font-size: inherit; padding: 0; text-decoration: underline; }
   </style>
 </head>
 <body>
@@ -39,28 +52,33 @@
     <form id="form" novalidate>
       <div class="field-row">
         <div class="field">
-          <label class="label" for="name1">Your name</label>
-          <input class="input" type="text" id="name1" placeholder="Maria" autocomplete="given-name" />
+          <label class="label" for="name1">Your name <span class="req">*</span></label>
+          <input class="input" type="text" id="name1" placeholder="Sofia" autocomplete="given-name" required />
         </div>
         <div class="field">
-          <label class="label" for="name2">Partner's name</label>
-          <input class="input" type="text" id="name2" placeholder="Nikos" autocomplete="off" />
+          <label class="label" for="name2">Partner's name <span class="req">*</span></label>
+          <input class="input" type="text" id="name2" placeholder="Daniel" autocomplete="off" required />
         </div>
       </div>
       <div class="preview-name" id="previewName" aria-live="polite"></div>
 
       <div class="field">
-        <label class="label" for="email">Email</label>
-        <input class="input" type="email" id="email" placeholder="you@example.com" autocomplete="email" inputmode="email" />
-        <p class="hint">You'll log in with this, and we'll send your receipt here.</p>
+        <label class="label" for="email">Email <span class="req">*</span></label>
+        <input class="input" type="email" id="email" placeholder="you@example.com" autocomplete="email" inputmode="email" required />
+        <p class="suggest" id="suggest">Did you mean <button type="button" id="suggestBtn"></button>?</p>
+        <p class="hint">You'll log in with this, and Stripe sends your receipt here.</p>
       </div>
 
       <div class="field">
-        <label class="label" for="password">Gallery password</label>
+        <label class="label" for="password">Gallery password <span class="req">*</span></label>
         <div class="pw-wrap">
-          <input class="input" type="password" id="password" placeholder="At least 6 characters" autocomplete="new-password" />
+          <input class="input" type="password" id="password" placeholder="At least 8 characters" autocomplete="new-password" required />
           <button type="button" class="pw-toggle" id="pwToggle">Show</button>
         </div>
+        <div class="meter" id="meter" data-score="0"><i></i><i></i><i></i><i></i></div>
+        <ul class="rules">
+          <li id="rLen">8+ characters</li><li id="rLetter">A letter</li><li id="rNum">A number</li>
+        </ul>
         <p class="hint">Only people with this password can see your photos.</p>
       </div>
 
@@ -71,11 +89,12 @@
       <p style="text-align:right; margin:-.4rem 0 .25rem"><button type="button" class="link-btn" id="codeToggle">Have an access code?</button></p>
 
       <div class="summary" id="summary">
-        <span>Wedding gallery · 12 months</span>
+        <span>Wedding Gallery · 12 months</span>
         <strong id="summaryPrice">€25</strong>
       </div>
 
       <button class="btn btn-lg btn-block" id="submitBtn" type="submit">Continue to payment</button>
+      <p class="hint" style="text-align:center;margin-top:.6rem"><span class="req">*</span> Required</p>
       <div class="trust"><span>One-time payment</span><span>Secure checkout by Stripe</span></div>
       <div class="alert alert-error" id="error" role="alert"></div>
     </form>
@@ -102,6 +121,60 @@
   name1El.addEventListener("input", updatePreview);
   name2El.addEventListener("input", updatePreview);
 
+  // Password rules: mirrored on the server (main.py, check_password).
+  function pwChecks(v) {
+    return { len: v.length >= 8, letter: /[A-Za-z]/.test(v), num: /\d/.test(v) };
+  }
+  pwEl.addEventListener("input", () => {
+    const v = pwEl.value, c = pwChecks(v);
+    $("rLen").classList.toggle("ok", c.len);
+    $("rLetter").classList.toggle("ok", c.letter);
+    $("rNum").classList.toggle("ok", c.num);
+    let score = 0;
+    if (v) score = 1;
+    if (c.len && c.letter && c.num) score = 2;
+    if (score === 2 && (v.length >= 12 || /[^A-Za-z0-9]/.test(v))) score = 3;
+    if (score === 3 && v.length >= 12 && /[^A-Za-z0-9]/.test(v) && /[a-z]/.test(v) && /[A-Z]/.test(v)) score = 4;
+    $("meter").dataset.score = score;
+  });
+
+  // Catch common email-domain typos (gmai1l.com, hotmial.com...) before submit.
+  const DOMAINS = ["gmail.com", "hotmail.com", "outlook.com", "yahoo.com", "icloud.com",
+                   "live.com", "protonmail.com", "proton.me", "aol.com", "msn.com", "me.com"];
+  function distance(a, b) {
+    const d = Array.from({ length: a.length + 1 }, (_, i) => [i]);
+    for (let j = 1; j <= b.length; j++) d[0][j] = j;
+    for (let i = 1; i <= a.length; i++)
+      for (let j = 1; j <= b.length; j++)
+        d[i][j] = Math.min(d[i-1][j] + 1, d[i][j-1] + 1, d[i-1][j-1] + (a[i-1] === b[j-1] ? 0 : 1));
+    return d[a.length][b.length];
+  }
+  function checkTypo() {
+    const v = emailEl.value.trim(), at = v.lastIndexOf("@");
+    $("suggest").style.display = "none";
+    if (at < 1) return;
+    const dom = v.slice(at + 1).toLowerCase();
+    if (!dom || DOMAINS.includes(dom)) return;
+    const best = DOMAINS.map(d => [d, distance(dom, d)]).sort((x, y) => x[1] - y[1])[0];
+    if (best[1] > 0 && best[1] <= 2) {
+      const fixed = v.slice(0, at + 1) + best[0];
+      $("suggestBtn").textContent = fixed;
+      $("suggest").style.display = "block";
+    }
+  }
+  emailEl.addEventListener("blur", checkTypo);
+  $("suggestBtn").addEventListener("click", () => {
+    emailEl.value = $("suggestBtn").textContent;
+    $("suggest").style.display = "none";
+  });
+
+  // Coming back from Stripe with the Back button restores this page from the
+  // browser cache with the button still saying "Setting up…". Re-enable it.
+  window.addEventListener("pageshow", () => {
+    btn.disabled = false;
+    btn.textContent = idleLabel();
+  });
+
   $("pwToggle").addEventListener("click", () => {
     const show = pwEl.type === "password";
     pwEl.type = show ? "text" : "password";
@@ -127,7 +200,9 @@
 
     if (!p1 || !p2) return showError("Please enter both names.");
     if (!email.includes("@")) return showError("Please enter a valid email.");
-    if (password.length < 6) return showError("Password must be at least 6 characters.");
+    const c = pwChecks(password);
+    if (!c.len) return showError("Password must be at least 8 characters.");
+    if (!c.letter || !c.num) return showError("Password needs at least one letter and one number.");
 
     // Combine the two fields into the display name shown at the top of the pages.
     const couple_names = `${p1} & ${p2}`;
@@ -150,7 +225,10 @@
       }
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        const detail = Array.isArray(err.detail) ? err.detail[0]?.msg : err.detail;
+        // Validation errors arrive as [{msg: "Value error, ..."}]; show just the message.
+        const detail = Array.isArray(err.detail)
+          ? (err.detail[0]?.msg || "").replace(/^Value error, /, "")
+          : err.detail;
         throw new Error(detail || `Server error ${res.status}`);
       }
 

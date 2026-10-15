@@ -18,10 +18,6 @@
       display: grid; gap: 2.5rem; align-items: center;
     }
     @media (min-width: 900px) { .hero { grid-template-columns: 1.1fr .9fr; padding-top: 3.5rem; } }
-    .eyebrow {
-      display: inline-flex; align-items: center; gap: .45rem; font-size: .8rem; font-weight: 600;
-      color: var(--accent); background: var(--accent-soft); padding: .35rem .8rem; border-radius: 999px; margin-bottom: 1.1rem;
-    }
     .hero h1 {
       font-family: var(--serif); font-weight: 600; line-height: 1.02; letter-spacing: -.01em;
       font-size: clamp(2.6rem, 7.5vw, 4.3rem); margin-bottom: 1.1rem;
@@ -42,7 +38,9 @@
     }
     .screen { background: var(--bg); border-radius: 31px; overflow: hidden; padding: 26px 16px 18px; }
     .screen .s-names { font-family: var(--serif); font-size: 1.55rem; font-weight: 600; text-align: center; line-height: 1.1; }
-    .screen .s-date { text-align: center; font-size: .68rem; color: var(--muted); letter-spacing: .14em; text-transform: uppercase; margin: .35rem 0 1rem; }
+    .screen .s-names span { font-size: 1.05rem; font-style: italic; color: var(--accent); }
+    .screen .s-date { text-align: center; font-size: .62rem; color: var(--muted); letter-spacing: .16em; text-transform: uppercase; margin-bottom: .35rem; }
+    .screen .s-btn { margin-top: 1rem; }
     .screen .s-btn { background: var(--accent); color: #fff; border-radius: 999px; text-align: center; font-size: .8rem; font-weight: 600; padding: .7rem; margin-bottom: .9rem; }
     .s-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
     .s-grid div { aspect-ratio: 1; border-radius: 6px; }
@@ -56,6 +54,10 @@
     }
     .float-chip.qr { left: max(4px, calc(50% - 200px)); top: 16%; }
     .float-chip.ok { right: max(4px, calc(50% - 200px)); bottom: 14%; color: var(--ok); }
+    @media (max-width: 520px) {
+      .float-chip.qr { top: auto; bottom: 38%; }
+      .float-chip.ok { bottom: 8%; }
+    }
 
     section.block { max-width: 1080px; margin: 0 auto; padding: 3.5rem 1.25rem; }
     .section-title { font-family: var(--serif); font-size: clamp(2rem, 5vw, 2.7rem); font-weight: 600; text-align: center; line-height: 1.1; margin-bottom: .6rem; }
@@ -85,7 +87,6 @@
     .price-card ul { list-style: none; text-align: left; max-width: 330px; margin: 0 auto 1.6rem; }
     .price-card li { padding: .4rem 0; font-size: .95rem; color: var(--ink-soft); }
     .price-card li::before { content: "✓"; color: var(--ok); font-weight: 700; margin-right: .6rem; }
-    .compare { font-size: .85rem; color: var(--muted); margin-top: 1rem; }
 
     .faq { max-width: 720px; margin: 0 auto; }
     .faq details { border-bottom: 1px solid var(--line); padding: 1.05rem .25rem; }
@@ -127,12 +128,11 @@
 
 <section class="hero">
   <div>
-    <span class="eyebrow">📸 No app for guests to download</span>
     <h1>Every photo from your wedding, <em>in one place.</em></h1>
     <p class="lede">Put one QR code on your tables. Guests scan it and their photos and videos go straight into your private gallery. No apps, no accounts, no chasing people for pictures afterwards.</p>
     <div class="cta-row">
       <a href="/create" class="btn btn-lg" id="heroCta">Create your gallery</a>
-      <span class="price-tag"><strong>€25</strong> one-time · no subscription</span>
+      <span class="price-tag"><strong>€25</strong> One-time · No subscription</span>
     </div>
     <div class="trust"><span>Ready in 1 minute</span><span>Full-quality files</span><span>Live for 1 year</span></div>
   </div>
@@ -141,8 +141,8 @@
     <div class="float-chip qr">▦ Scan to share</div>
     <div class="phone">
       <div class="screen">
-        <div class="s-names">Maria &amp; Nikos</div>
         <div class="s-date">Share your photos</div>
+        <div class="s-names">Sofia &amp; Daniel's<br><span>Wedding</span></div>
         <div class="s-btn">+ Add photos &amp; videos</div>
         <div class="s-grid">
           <div style="background:linear-gradient(135deg,#E9C9BE,#C98B7F)"></div>
@@ -197,7 +197,7 @@
 
 <section class="block" id="pricing">
   <h2 class="section-title">One simple price</h2>
-  <p class="section-sub">Pay once. No subscription, no per-guest fees, no limits on photos.</p>
+  <p class="section-sub">Pay once. No subscription, no per-guest fees, no limits on photos &amp; videos.</p>
   <div class="price-card">
     <div class="amount">€25</div>
     <div class="per">one-time, per wedding</div>
@@ -210,7 +210,6 @@
       <li>Live for 12 months</li>
     </ul>
     <a href="/create" class="btn btn-lg btn-block">Create your gallery</a>
-    <p class="compare">Popular wedding photo apps charge around €45 or more for the same thing.</p>
   </div>
 </section>
 
@@ -220,9 +219,10 @@
     <details><summary>Do my guests need to download an app?</summary><p>No. They scan the QR code with their phone camera, type their name and pick photos. It works in any browser on iPhone and Android.</p></details>
     <details><summary>Who can see the photos?</summary><p>Only you. The gallery is protected by the password you choose. Guests can add photos, but they can't see anyone else's.</p></details>
     <details><summary>Are the photos compressed?</summary><p>No. Files are stored exactly as your guests' phones took them, in full quality.</p></details>
-    <details><summary>How long do we keep access?</summary><p>Your gallery stays live for 12 months after you create it. Download everything in one zip whenever you like before then.</p></details>
+    <details><summary>How long do we keep access?</summary><p>Your gallery stays live for 12 months after you create it. Download every photo and video in one zip, with a single click, whenever you like before then.</p></details>
     <details><summary>When should we set it up?</summary><p>Any time before the wedding. It takes about a minute, and you can test the QR code yourself straight away.</p></details>
     <details><summary>Is it really a one-time payment?</summary><p>Yes. €25, once. No subscription and nothing to cancel.</p></details>
+    <details><summary>Why does it cost less than other wedding photo apps?</summary><p>We keep Confetti simple: one QR code, one private gallery, one price. No add-ons or upsells, so you get the full thing for about half of what most alternatives charge.</p></details>
   </div>
 </section>
 

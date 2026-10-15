@@ -81,6 +81,10 @@ STRIPE_WEBHOOK_SECRET   = _optional("STRIPE_WEBHOOK_SECRET")
 # account.  Flip to real payments simply by setting the two vars above.
 PAYMENTS_ENABLED = bool(STRIPE_PAYMENT_LINK_URL and STRIPE_WEBHOOK_SECRET)
 
+# Reject signup emails whose domain doesn't exist (typos like "gmai1l.com").
+# Fails open if DNS is unreachable. Tests turn it off to stay offline.
+EMAIL_DNS_CHECK = (_optional("EMAIL_DNS_CHECK", "true") or "true").lower() != "false"
+
 # Optional comp code: when payments are ON, entering this code on /create skips
 # payment and unlocks the gallery for free (for friends, giveaways, etc.).
 # Leave unset to disable. Ignored in stub mode (everything is already free).

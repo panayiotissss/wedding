@@ -1,0 +1,221 @@
+"""
+The four checks done by hand on staging, as automated tests, plus the
+signup rules around them. Run with:  pytest -q
+"""
+
+import hashlib
+import hmac
+import json
+import time
+from datetime import datetime, timezone
+
+import config
+import storage
+from db import Event, SessionLocal
+
+
+def _event(slug):
+    with SessionLocal() as db:
+        return db.query(Event).filter(Event.slug == slug).first()
+
+
+def _stripe_webhook(client, payload: dict, secret: str = "whsec_test_secret"):
+    """Send a webhook signed exactly the way Stripe signs it."""
+    body = json.dumps(payload)
+    ts = int(time.time())
+    sig = hmac.new(secret.encode(), f"{ts}.{body}".encode(), hashlib.sha256).hexdigest()
+    return client.post(
+        "/api/stripe/webhook",
+        content=body,
+        headers={"stripe-signature": f"t={ts},v1={sig}", "content-type": "application/json"},
+    )
+
+
+def _checkout_completed(event_id: str) -> dict:
+    return {
+        "id": "evt_test",
+        "object": "event",
+        "type": "checkout.session.completed",
+        "data": {"object": {"id": "cs_test_123", "object": "checkout.session",
+                            "client_reference_id": event_id}},
+    }
+
+
+# ── Test 1: paid signup ─────────────────────────────────────────────────────
+
+def test_paid_signup_goes_to_stripe_then_webhook_activates(client, signup):
+    res = signup()
+    assert res.status_code == 200
+    data = res.json()
+    assert data["status"] == "pending_payment"
+
+    ev = _event(data["slug"])
+    assert data["payment_url"].startswith(config.STRIPE_PAYMENT_LINK_URL)
+    assert f"client_reference_id={ev.id}" in data["payment_url"]
+
+    # Guests can't upload until it's paid.
+    up = client.post(f"/api/e/{ev.slug}/upload-url", json={
+        "filename": "a.jpg", "content_type": "image/jpeg", "guest_name": "Eleni", "file_size": 10})
+    assert up.status_code == 403
+
+    assert _stripe_webhook(client, _checkout_completed(ev.id)).status_code == 200
+
+    ev = _event(data["slug"])
+    assert ev.status == "active"
+    assert ev.stripe_ref == "cs_test_123"
+    assert ev.expires_at is not None
+    assert client.get(f"/api/events/{ev.slug}/status").json()["status"] == "active"
+
+
+def test_webhook_with_bad_signature_is_rejected(client, signup):
+    ev = _event(signup().json()["slug"])
+    res = _stripe_webhook(client, _checkout_completed(ev.id), secret="whsec_wrong")
+    assert res.status_code == 400
+    assert _event(ev.slug).status == "pending_payment"
+
+
+# ── Test 2: free access code ────────────────────────────────────────────────
+
+def test_free_access_code_skips_payment(client, signup):
+    res = signup(access_code="FREE-TEST")
+    assert res.status_code == 200
+    data = res.json()
+    assert data["status"] == "active"
+    assert data["payment_url"] == f"/create/success?slug={data['slug']}"
+    assert _event(data["slug"]).paid_at is not None
+
+
+# ── Test 3: wrong access code ───────────────────────────────────────────────
+
+def test_wrong_access_code_is_rejected_and_nothing_is_created(client, signup):
+    res = signup(access_code="NOPE")
+    assert res.status_code == 400
+    assert "access code" in res.json()["detail"]
+    with SessionLocal() as db:
+        assert db.query(Event).count() == 0
+
+
+# ── Test 4: guest upload and the couple's gallery ──────────────────────────
+
+def test_upload_url_and_gallery_listing(client, signup, monkeypatch):
+    slug = signup(access_code="FREE-TEST").json()["slug"]
+    ev = _event(slug)
+
+    up = client.post(f"/api/e/{slug}/upload-url", json={
+        "filename": "IMG 1.jpg", "content_type": "image/jpeg",
+        "guest_name": "Eleni K", "file_size": 1024})
+    assert up.status_code == 200
+    key = up.json()["key"]
+    # Stored under this event's own folder, under the staging root.
+    assert key.startswith(f"staging/events/{ev.storage_prefix}/photos/eleni_k/")
+    assert up.json()["url"].startswith("https://")
+
+    # The gallery lists what's in R2, grouped by guest (R2 itself is faked).
+    monkeypatch.setattr(storage, "list_prefix", lambda prefix: [
+        {"Key": key, "LastModified": datetime(2026, 10, 15, tzinfo=timezone.utc), "ETag": "x"},
+    ])
+    photos = client.get(f"/api/e/{slug}/photos")
+    assert photos.status_code == 200  # signup logged this browser in
+    groups = photos.json()
+    assert groups[0]["guest"] == "eleni_k"
+    assert groups[0]["photos"][0]["key"] == key
+
+
+def test_gallery_needs_login(client, signup):
+    slug = signup(access_code="FREE-TEST").json()["slug"]
+    client.post(f"/api/e/{slug}/logout")
+    assert client.get(f"/api/e/{slug}/photos").status_code == 401
+
+
+def test_upload_rejects_wrong_type_and_oversize(client, signup):
+    slug = signup(access_code="FREE-TEST").json()["slug"]
+    base = {"filename": "a", "guest_name": "Eleni"}
+    bad_type = client.post(f"/api/e/{slug}/upload-url",
+                           json={**base, "content_type": "application/pdf", "file_size": 10})
+    too_big = client.post(f"/api/e/{slug}/upload-url",
+                          json={**base, "content_type": "image/jpeg",
+                                "file_size": config.MAX_FILE_SIZE + 1})
+    assert bad_type.status_code == 422
+    assert too_big.status_code == 422
+
+
+def test_delete_refuses_keys_outside_the_event(client, signup, monkeypatch):
+    slug = signup(access_code="FREE-TEST").json()["slug"]
+    deleted = []
+    monkeypatch.setattr(storage, "delete_key", deleted.append)
+    res = client.post(f"/api/e/{slug}/delete", json={"key": "staging/events/someone-else/photos/x.jpg"})
+    assert res.status_code == 400
+    assert deleted == []
+
+
+# ── Signup rules ────────────────────────────────────────────────────────────
+
+def test_back_from_checkout_then_access_code_reuses_the_signup(client, signup):
+    """Went to Stripe, pressed Back, entered a code with the same email."""
+    first = signup().json()
+    assert first["status"] == "pending_payment"
+
+    second = signup(access_code="FREE-TEST", couple_names="Sofia & Dan")
+    assert second.status_code == 200
+    assert second.json()["slug"] == first["slug"]  # same gallery, no duplicate
+    ev = _event(first["slug"])
+    assert ev.status == "active"
+    assert ev.couple_names == "Sofia & Dan"
+    with SessionLocal() as db:
+        assert db.query(Event).count() == 1
+
+
+def test_paid_email_cannot_sign_up_again(client, signup):
+    signup(access_code="FREE-TEST")
+    assert signup().status_code == 409
+
+
+def test_email_login_ignores_case(client, signup):
+    signup(access_code="FREE-TEST", email="Sofia@Example.com")
+    res = client.post("/api/login", json={"email": "SOFIA@example.COM", "password": "Wedding2026"})
+    assert res.status_code == 200
+
+
+def test_weak_passwords_are_rejected(signup):
+    assert signup(password="short1").status_code == 422          # under 8
+    assert signup(password="onlyletters").status_code == 422     # no number
+    assert signup(password="12345678").status_code == 422        # no letter
+    assert signup(password="Wedding2026").status_code == 200
+
+
+def test_invalid_email_syntax_is_rejected(signup):
+    assert signup(email="not-an-email").status_code == 422
+    assert signup(email="a@b").status_code == 422
+
+
+def test_email_with_missing_domain_is_rejected(signup, monkeypatch):
+    import emailcheck
+    monkeypatch.setattr(config, "EMAIL_DNS_CHECK", True)
+    monkeypatch.setattr(emailcheck, "_domain_status",
+                        lambda d: "exists" if d == "gmail.com" else "missing")
+    res = signup(email="fefefef@gmai1l.com")
+    assert res.status_code == 422
+    assert "gmai1l.com" in res.text
+
+
+def test_email_check_fails_open_when_dns_is_down(signup, monkeypatch):
+    import emailcheck
+    monkeypatch.setattr(config, "EMAIL_DNS_CHECK", True)
+    monkeypatch.setattr(emailcheck, "_domain_status", lambda d: "missing")  # even gmail "missing"
+    assert signup(email="sofia@example.com").status_code == 200
+
+
+# ── Pages ───────────────────────────────────────────────────────────────────
+
+def test_pages_and_favicon_load(client):
+    for path in ["/", "/create", "/login", "/create/success"]:
+        assert client.get(path).status_code == 200, path
+    fav = client.get("/favicon.ico")
+    assert fav.status_code == 200
+    assert fav.headers["content-type"].startswith("image/svg+xml")
+
+
+def test_no_em_dashes_in_pages():
+    from pathlib import Path
+    for page in Path("static").glob("*.html"):
+        assert "—" not in page.read_text(encoding="utf-8"), page.name

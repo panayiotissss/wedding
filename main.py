@@ -31,6 +31,7 @@ from sqlalchemy.orm import Session
 from starlette.middleware.sessions import SessionMiddleware
 
 import config
+import emailcheck
 import payments
 import storage
 from db import Event, get_db, init_db, now_utc
@@ -198,29 +199,22 @@ class CreateEventRequest(BaseModel):
     @field_validator("password")
     @classmethod
     def check_password(cls, v: str) -> str:
-        if len(v) < 6:
-            raise ValueError("Password must be at least 6 characters")
+        # Mirrored in static/create.html so the form can say why before submitting.
+        if len(v) < 8:
+            raise ValueError("Password must be at least 8 characters.")
+        if not re.search(r"[A-Za-z]", v) or not re.search(r"\d", v):
+            raise ValueError("Password needs at least one letter and one number.")
         return v
 
     @field_validator("email")
     @classmethod
     def check_email(cls, v: str) -> str:
-        v = v.strip()
-        if "@" not in v or "." not in v.split("@")[-1]:
-            raise ValueError("A valid email is required")
-        return v
+        return emailcheck.check_email(v)
 
 
 @app.post("/api/events")
 def create_event(body: CreateEventRequest, request: Request, db: Session = Depends(get_db)):
     email = _normalize_email(body.email)
-
-    # Email is the login identifier, so it must be unique.
-    if db.query(Event).filter(func.lower(Event.contact_email) == email).first():
-        raise HTTPException(
-            status_code=409,
-            detail="An account with this email already exists. Please log in instead.",
-        )
 
     # A valid comp code lets a friend skip payment even when Stripe is on.
     code = (body.access_code or "").strip()
@@ -229,17 +223,31 @@ def create_event(body: CreateEventRequest, request: Request, db: Session = Depen
         # Say so, rather than silently sending them to checkout.
         raise HTTPException(status_code=400, detail="That access code isn't valid.")
 
-    slug = _unique_slug(db)
-    ev = Event(
-        slug=slug,
-        couple_names=body.couple_names,
-        password_hash=hash_password(body.password),
-        contact_email=email,
-        status="pending_payment",
-        # Readable R2 folder: couple name + slug (slug guarantees uniqueness,
-        # since two different couples can share the same names).
-        storage_prefix=f"{slugify_names(body.couple_names)}-{slug}",
-    )
+    # Email is the login identifier, so it must be unique. The exception is an
+    # unpaid signup with the same email: someone who went to checkout and came
+    # back (e.g. to use an access code instead). Reuse that row rather than
+    # blocking them; keeping its id means an open checkout still matches it.
+    ev = db.query(Event).filter(func.lower(Event.contact_email) == email).first()
+    if ev and ev.status != "pending_payment":
+        raise HTTPException(
+            status_code=409,
+            detail="An account with this email already exists. Please log in instead.",
+        )
+    if ev:
+        ev.couple_names = body.couple_names
+        ev.password_hash = hash_password(body.password)
+    else:
+        slug = _unique_slug(db)
+        ev = Event(
+            slug=slug,
+            couple_names=body.couple_names,
+            password_hash=hash_password(body.password),
+            contact_email=email,
+            status="pending_payment",
+            # Readable R2 folder: couple name + slug (slug guarantees uniqueness,
+            # since two different couples can share the same names).
+            storage_prefix=f"{slugify_names(body.couple_names)}-{slug}",
+        )
 
     if config.PAYMENTS_ENABLED and not code_ok:
         db.add(ev)
