@@ -446,3 +446,40 @@ def test_admin_report_needs_token_and_counts(client, signup, monkeypatch):
     assert rep["totals"]["galleries"] == 2 and rep["totals"]["from_guests"] == 1
     assert rep["totals"]["photos"] == 2 and rep["totals"]["bytes"] == 2000
     assert client.get("/admin").status_code == 200
+
+
+# ── WED-24: partner access codes ───────────────────────────────────────────
+
+ADMIN = {"X-Admin-Token": "test-admin"}
+
+
+def test_partner_code_gives_free_galleries_up_to_its_limit(client, signup):
+    assert client.post("/api/admin/codes", json={"code": "maria-paphos", "partner": "Maria Weddings", "max_uses": 2}).status_code == 401
+    assert client.post("/api/admin/codes", json={"code": "maria-paphos", "partner": "Maria Weddings", "max_uses": 2}, headers=ADMIN).status_code == 200
+
+    s1 = signup(access_code="maria-paphos", email="c1@example.com").json()       # case-insensitive
+    s2 = signup(access_code="MARIA-PAPHOS", email="c2@example.com").json()
+    assert s1["status"] == s2["status"] == "active"
+    assert _event(s1["slug"]).access_code == "MARIA-PAPHOS"
+    third = signup(access_code="MARIA-PAPHOS", email="c3@example.com")
+    assert third.status_code == 400 and "used up" in third.json()["detail"]
+
+    codes = client.get("/api/admin/codes", headers=ADMIN).json()
+    assert codes[0]["uses"] == 2 and codes[0]["galleries"] == 2
+
+
+def test_switched_off_code_is_rejected(client, signup):
+    client.post("/api/admin/codes", json={"code": "OFFCODE", "partner": "Venue", "max_uses": None}, headers=ADMIN)
+    client.post("/api/admin/codes/OFFCODE/toggle", headers=ADMIN)
+    assert signup(access_code="OFFCODE").status_code == 400
+
+
+def test_env_code_still_works_and_is_recorded(signup):
+    slug = signup(access_code="FREE-TEST").json()["slug"]
+    assert _event(slug).access_code == "FREE_ACCESS_CODE"
+
+
+def test_bad_or_duplicate_codes_are_refused(client):
+    assert client.post("/api/admin/codes", json={"code": "a b", "partner": "x"}, headers=ADMIN).status_code == 422
+    client.post("/api/admin/codes", json={"code": "DUPE1", "partner": "x"}, headers=ADMIN)
+    assert client.post("/api/admin/codes", json={"code": "dupe1", "partner": "x"}, headers=ADMIN).status_code == 409

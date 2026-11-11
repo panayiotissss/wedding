@@ -38,7 +38,7 @@ import emailcheck
 import mailer
 import payments
 import storage
-from db import Event, PasswordReset, SessionLocal, get_db, init_db, now_utc
+from db import AccessCode, Event, PasswordReset, SessionLocal, get_db, init_db, now_utc
 from security import hash_password, verify_password
 
 log = logging.getLogger("confetti")
@@ -297,9 +297,21 @@ def create_event(body: CreateEventRequest, request: Request, background: Backgro
                  db: Session = Depends(get_db)):
     email = _normalize_email(body.email)
 
-    # A valid comp code lets a friend skip payment even when Stripe is on.
+    # A valid code skips payment even when Stripe is on: a partner's code from
+    # the database (WED-24) or the single FREE_ACCESS_CODE from the environment.
     code = (body.access_code or "").strip()
-    code_ok = bool(config.FREE_ACCESS_CODE) and code == config.FREE_ACCESS_CODE
+    partner_code = None
+    code_ok = False
+    if code:
+        partner_code = db.get(AccessCode, code.upper())
+        if partner_code and partner_code.active:
+            if partner_code.max_uses is not None and partner_code.uses >= partner_code.max_uses:
+                raise HTTPException(status_code=400, detail="That access code has already been used up.")
+            code_ok = True
+        elif config.FREE_ACCESS_CODE and code == config.FREE_ACCESS_CODE:
+            code_ok, partner_code = True, None
+        else:
+            partner_code = None
     if code and not code_ok and config.PAYMENTS_ENABLED:
         # Say so, rather than silently sending them to checkout.
         raise HTTPException(status_code=400, detail="That access code isn't valid.")
@@ -340,6 +352,10 @@ def create_event(body: CreateEventRequest, request: Request, background: Backgro
 
     # Free path: stub mode (no Stripe) OR a valid comp code — unlock immediately.
     _activate(ev)
+    if code_ok:
+        ev.access_code = partner_code.code if partner_code else "FREE_ACCESS_CODE"
+        if partner_code:
+            partner_code.uses += 1
     db.add(ev)
     db.commit()
     background.add_task(_send_welcome, ev)
@@ -819,7 +835,7 @@ def admin_report(request: Request, db: Session = Depends(get_db)):
         rows.append({
             "slug": ev.slug, "names": ev.couple_names, "email": ev.contact_email, "status": ev.status,
             "created_at": iso(ev.created_at), "paid_at": iso(ev.paid_at), "expires_at": iso(ev.expires_at),
-            "referred_by": ev.referred_by, "photos": len(photos), "bytes": size,
+            "referred_by": ev.referred_by, "access_code": ev.access_code, "photos": len(photos), "bytes": size,
             "last_upload": iso(max((o["LastModified"] for o in photos), default=None)),
             "last_download_at": iso(ev.last_download_at), "all_deleted_at": iso(ev.all_deleted_at),
             "freeup_warned_at": iso(ev.freeup_warned_at), "files_freed_at": iso(ev.files_freed_at),
@@ -833,6 +849,50 @@ def admin_report(request: Request, db: Session = Depends(get_db)):
         },
         "galleries": rows,
     }
+
+
+class CodeRequest(BaseModel):
+    code: str
+    partner: str
+    max_uses: int | None = 2
+
+    @field_validator("code")
+    @classmethod
+    def check_code(cls, v: str) -> str:
+        v = v.strip().upper()
+        if not re.fullmatch(r"[A-Z0-9-]{4,40}", v):
+            raise ValueError("Codes are 4–40 letters, numbers or dashes.")
+        return v
+
+
+@app.get("/api/admin/codes")
+def list_codes(request: Request, db: Session = Depends(get_db)):
+    _require_admin(request)
+    counts = dict(db.query(Event.access_code, func.count(Event.id)).group_by(Event.access_code).all())
+    return [{"code": c.code, "partner": c.partner, "max_uses": c.max_uses, "uses": c.uses, "active": c.active,
+             "galleries": counts.get(c.code, 0), "created_at": _aware(c.created_at).isoformat()}
+            for c in db.query(AccessCode).order_by(AccessCode.created_at.desc()).all()]
+
+
+@app.post("/api/admin/codes")
+def create_code(body: CodeRequest, request: Request, db: Session = Depends(get_db)):
+    _require_admin(request)
+    if db.get(AccessCode, body.code):
+        raise HTTPException(status_code=409, detail="That code already exists.")
+    db.add(AccessCode(code=body.code, partner=body.partner.strip()[:120], max_uses=body.max_uses))
+    db.commit()
+    return {"ok": True, "code": body.code}
+
+
+@app.post("/api/admin/codes/{code}/toggle")
+def toggle_code(code: str, request: Request, db: Session = Depends(get_db)):
+    _require_admin(request)
+    c = db.get(AccessCode, code.upper())
+    if not c:
+        raise HTTPException(status_code=404, detail="No such code.")
+    c.active = not c.active
+    db.commit()
+    return {"ok": True, "active": c.active}
 
 
 @app.get("/admin")
