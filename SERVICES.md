@@ -54,6 +54,7 @@ Environment variables (values only in Render):
 | `SESSION_SECRET` | Signs log-in cookies | own value | own value |
 | `PUBLIC_BASE_URL` | Used in QR codes and email links | `https://confettiwedding.net` | staging URL |
 | `STRIPE_PAYMENT_LINK_URL`, `STRIPE_WEBHOOK_SECRET` | Stripe | live mode | test mode |
+| `STRIPE_INVITE_LINK_URL`, `STRIPE_BUNDLE_LINK_URL` | Stripe: Invitation + RSVP (€20) and both (€39). Until set, those options need an access code | live mode | test mode |
 | `FREE_ACCESS_CODE` | Code that skips payment | set in Render | `STAGING-FREE` |
 | `RESEND_API_KEY` | Sends email | send-only key | same key |
 | `ADMIN_TOKEN` | Protects `/api/admin/cleanup` | set in Render | set in Render |

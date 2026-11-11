@@ -68,19 +68,31 @@ def _button(url: str, label: str) -> str:
             f'text-decoration:none;font-weight:600;padding:13px 24px;border-radius:999px">{escape(label)}</a>')
 
 
-def welcome(to: str, names: str, gallery_url: str, qr_url: str) -> bool:
+def welcome(to: str, names: str, gallery_url: str | None, qr_url: str | None,
+            invite_url: str | None = None) -> bool:
+    """Sent once the account is paid; mentions whatever the couple bought."""
     n = escape(names)
+    parts, text = [], [f"Congratulations, {names}!"]
+    if invite_url:
+        parts.append(f"""<p style="color:#5C514A;line-height:1.55"><b>Your invitation:</b> add your details,
+pick your fonts, then send the link to your guests. They open the envelope and reply in one tap.</p>
+<p style="margin:18px 0 24px">{_button(invite_url, "Create my invitation")}</p>""")
+        text.append(f"Create your invitation: {invite_url}")
+    if gallery_url:
+        parts.append(f"""<p style="color:#5C514A;line-height:1.55"><b>Your photo gallery:</b> print your QR code on
+table cards, menus or a sign. Guests scan it and their photos land in your gallery.<br>
+<a href="{escape(qr_url or gallery_url)}" style="color:#9E4F45">Download your QR code</a></p>
+<p style="margin:18px 0 24px">{_button(gallery_url, "Open my gallery")}</p>""")
+        text.append(f"Open your gallery: {gallery_url}\nDownload your QR code: {qr_url}")
     html = _layout(f"""
-<h1 style="font-family:Georgia,serif;font-size:26px;margin:0 0 8px">Your gallery is ready 🎉</h1>
+<h1 style="font-family:Georgia,serif;font-size:26px;margin:0 0 8px">You're all set 🎉</h1>
 <p style="color:#5C514A;line-height:1.55">{n}, congratulations! Here's everything you need.</p>
-<p style="margin:24px 0">{_button(gallery_url, "Open my gallery")}</p>
-<p style="color:#5C514A;line-height:1.55"><b>Your QR code:</b> print it on table cards, menus or a sign.
-Guests scan it and their photos land in your gallery.<br>
-<a href="{escape(qr_url)}" style="color:#9E4F45">Download your QR code</a></p>
+{"".join(parts)}
 <p style="color:#5C514A;line-height:1.55"><b>Logging in:</b> use this email ({escape(to)}) and the password you chose.</p>""")
-    text = (f"Your gallery is ready, {names}!\n\nOpen your gallery: {gallery_url}\n"
-            f"Download your QR code: {qr_url}\n\nLog in with {to} and the password you chose.")
-    return send(to, "Your Confetti gallery is ready", html, text)
+    text.append(f"Log in with {to} and the password you chose.")
+    subject = ("Your Confetti invitation and gallery are ready" if invite_url and gallery_url
+               else "Your Confetti invitation is ready" if invite_url else "Your Confetti gallery is ready")
+    return send(to, subject, html, "\n\n".join(text))
 
 
 def password_reset(to: str, reset_url: str) -> bool:

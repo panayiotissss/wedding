@@ -48,6 +48,11 @@ class Event(Base):
     referred_by: Mapped[str | None] = mapped_column(String(16), nullable=True)
 
     status: Mapped[str] = mapped_column(String(20), default="pending_payment")
+    # What the couple has (WED-36): the photo gallery and/or the invitation +
+    # RSVP, bought together (bundle) or one now and the other later.
+    plan: Mapped[str] = mapped_column(String(10), default="photos")   # chosen at signup
+    photos: Mapped[bool] = mapped_column(Boolean, default=False)
+    invite: Mapped[bool] = mapped_column(Boolean, default=False)
     stripe_ref: Mapped[str | None] = mapped_column(String(120), nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
@@ -85,9 +90,16 @@ class Invitation(Base):
     names: Mapped[str] = mapped_column(String(120), default="")
     date: Mapped[str] = mapped_column(String(10), default="")       # YYYY-MM-DD
     time: Mapped[str] = mapped_column(String(5), default="")        # HH:MM
-    venue: Mapped[str] = mapped_column(String(120), default="")
-    address: Mapped[str] = mapped_column(String(200), default="")
-    map_url: Mapped[str] = mapped_column(String(500), default="")
+    venue: Mapped[str] = mapped_column(String(120), default="")      # the ceremony (e.g. church)
+    address: Mapped[str] = mapped_column(String(200), default="")    # unused, kept for old rows
+    map_url: Mapped[str] = mapped_column(String(500), default="")    # ceremony map
+    reception: Mapped[str] = mapped_column(String(120), default="")
+    reception_map: Mapped[str] = mapped_column(String(500), default="")
+    extra1_label: Mapped[str] = mapped_column(String(40), default="")
+    extra1_text: Mapped[str] = mapped_column(String(120), default="")
+    extra2_label: Mapped[str] = mapped_column(String(40), default="")
+    extra2_text: Mapped[str] = mapped_column(String(120), default="")
+    font: Mapped[str] = mapped_column(String(20), default="classic")
     message: Mapped[str] = mapped_column(String(600), default="")
     rsvp_by: Mapped[str] = mapped_column(String(10), default="")    # YYYY-MM-DD
     theme: Mapped[str] = mapped_column(String(20), default="envelope")
@@ -149,6 +161,10 @@ SessionLocal = sessionmaker(bind=engine, expire_on_commit=False)
 # Columns added after the table first existed. create_all() never adds
 # columns to an existing table, so Postgres gets them here (idempotent).
 ADDED_COLUMNS = [
+    # Existing galleries all bought photos, so they get photos = TRUE.
+    "plan VARCHAR(10) DEFAULT 'photos'",
+    "photos BOOLEAN DEFAULT TRUE",
+    "invite BOOLEAN DEFAULT FALSE",
     "storage_prefix VARCHAR(120)",
     "referred_by VARCHAR(16)",
     "last_download_at TIMESTAMPTZ",
@@ -156,6 +172,17 @@ ADDED_COLUMNS = [
     "freeup_warned_at TIMESTAMPTZ",
     "files_freed_at TIMESTAMPTZ",
     "access_code VARCHAR(40)",
+]
+
+
+INVITATION_ADDED_COLUMNS = [
+    "reception VARCHAR(120) DEFAULT ''",
+    "reception_map VARCHAR(500) DEFAULT ''",
+    "extra1_label VARCHAR(40) DEFAULT ''",
+    "extra1_text VARCHAR(120) DEFAULT ''",
+    "extra2_label VARCHAR(40) DEFAULT ''",
+    "extra2_text VARCHAR(120) DEFAULT ''",
+    "font VARCHAR(20) DEFAULT 'classic'",
 ]
 
 
@@ -168,6 +195,8 @@ def init_db() -> None:
         with engine.begin() as conn:
             for col in ADDED_COLUMNS:
                 conn.execute(text(f"ALTER TABLE events ADD COLUMN IF NOT EXISTS {col}"))
+            for col in INVITATION_ADDED_COLUMNS:
+                conn.execute(text(f"ALTER TABLE invitations ADD COLUMN IF NOT EXISTS {col}"))
 
 
 def get_db():

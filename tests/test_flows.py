@@ -485,24 +485,86 @@ def test_bad_or_duplicate_codes_are_refused(client):
     assert client.post("/api/admin/codes", json={"code": "dupe1", "partner": "x"}, headers=ADMIN).status_code == 409
 
 
-# ── WED-36: invitation + RSVP ───────────────────────────────────────────────
+# ── WED-36: accounts with add-ons, invitation + RSVP ────────────────────────
 
 _INVITE = {"names": "Sofia & Daniel", "date": "2027-06-12", "time": "18:30", "venue": "Agios Georgios",
-           "address": "Paphos", "map_url": "https://maps.example/x", "message": "Join us",
-           "rsvp_by": "2027-05-01"}
+           "map_url": "https://maps.example/x", "reception": "Elysium Hotel", "reception_map": "",
+           "extra1_label": "Dress code", "extra1_text": "Black tie", "extra2_label": "", "extra2_text": "",
+           "message": "Join us", "rsvp_by": "2027-05-01", "font": "romantic"}
 
 
-def _gallery(signup):
-    return signup(access_code="FREE-TEST").json()["slug"]
+def _account(signup, plan="photos"):
+    return signup(access_code="FREE-TEST", plan=plan).json()
 
 
-def test_invitation_draft_is_private_until_published(client, signup):
-    slug = _gallery(signup)
+def test_signup_plans_pick_the_right_payment_link(client, signup, monkeypatch):
+    monkeypatch.setattr(config, "STRIPE_INVITE_LINK_URL", "https://buy.stripe.com/test_invite")
+    monkeypatch.setattr(config, "STRIPE_BUNDLE_LINK_URL", "https://buy.stripe.com/test_bundle")
+    res = signup(plan="invite").json()
+    assert res["payment_url"].startswith("https://buy.stripe.com/test_invite")
+    res = signup(email="b@example.com", plan="bundle").json()
+    assert res["payment_url"].startswith("https://buy.stripe.com/test_bundle")
+    assert signup(email="c@example.com", plan="gold").status_code == 422
+
+    # Paying the bundle turns on both.
+    ev = _event(res["slug"])
+    _stripe_webhook(client, _checkout_completed(ev.id))
+    ev = _event(res["slug"])
+    assert ev.status == "active" and ev.photos and ev.invite
+
+
+def test_plan_without_a_link_yet_says_so(signup):
+    res = signup(plan="invite")
+    assert res.status_code == 503 and "access code" in res.json()["detail"]
+
+
+def test_invite_only_account_has_no_gallery_uploads(client, signup):
+    acc = _account(signup, "invite")
+    assert acc["next"] == f"/e/{acc['slug']}/invite"
+    me = client.get(f"/api/e/{acc['slug']}/account").json()
+    assert me["invite"] and not me["photos"]
+    up = client.post(f"/api/e/{acc['slug']}/upload-url", json={
+        "filename": "a.jpg", "content_type": "image/jpeg", "guest_name": "Eleni", "file_size": 10})
+    assert up.status_code == 403
+    assert client.get(f"/api/e/{acc['slug']}/info").json()["active"] is False
+
+
+def test_login_goes_to_what_the_couple_has(client, signup):
+    for plan, email, where in (("photos", "p@example.com", "gallery"), ("invite", "i@example.com", "invite"),
+                               ("bundle", "b@example.com", "home")):
+        slug = signup(email=email, access_code="FREE-TEST", plan=plan).json()["slug"]
+        res = client.post("/api/login", json={"email": email, "password": "Wedding2026"}).json()
+        assert res["next"] == f"/e/{slug}/{where}", plan
+
+
+def test_addon_after_signup(client, signup, monkeypatch):
+    acc = _account(signup, "photos")
+    slug = acc["slug"]
+    # No invitation link configured yet: clear message.
+    assert client.post(f"/api/e/{slug}/addon", json={"product": "invite"}).status_code == 503
+    monkeypatch.setattr(config, "STRIPE_INVITE_LINK_URL", "https://buy.stripe.com/test_invite")
+    res = client.post(f"/api/e/{slug}/addon", json={"product": "invite"}).json()
+    ev = _event(slug)
+    assert f"client_reference_id=inv_{ev.id}" in res["payment_url"]
+    assert client.get("/api/my-latest").json()["addon"] == "invite"
+    _stripe_webhook(client, _checkout_completed(f"inv_{ev.id}"))
+    assert client.get(f"/api/e/{slug}/account").json()["invite"] is True
+    # ...and with a code instead.
+    acc2 = signup(email="z@example.com", access_code="FREE-TEST", plan="invite").json()
+    assert client.post(f"/api/e/{acc2['slug']}/addon", json={"product": "photos", "access_code": "FREE-TEST"}).json()["ok"]
+    assert client.get(f"/api/e/{acc2['slug']}/account").json()["home"] == f"/e/{acc2['slug']}/home"
+    client.cookies.clear()
+    assert client.post(f"/api/e/{slug}/addon", json={"product": "photos"}).status_code == 401
+
+
+def test_invitation_preview_is_private_without_the_addon(client, signup):
+    slug = _account(signup, "photos")["slug"]
     got = client.get(f"/api/e/{slug}/invitation").json()
-    assert got["names"] == "Sofia & Daniel" and got["status"] == "draft"
-    assert client.put(f"/api/e/{slug}/invitation", json=_INVITE).status_code == 200
+    assert got["names"] == "Sofia & Daniel" and got["font"] == "classic" and got["has_invite"] is False
+    saved = client.put(f"/api/e/{slug}/invitation", json=_INVITE).json()
+    assert saved["reception"] == "Elysium Hotel" and saved["font"] == "romantic" and saved["live"] is False
 
-    # The couple sees a preview; a guest (no session) sees nothing yet.
+    # The couple can preview; guests see nothing and can't reply.
     assert client.get(f"/api/i/{slug}").json()["preview"] is True
     client.cookies.clear()
     assert client.get(f"/api/i/{slug}").status_code == 404
@@ -511,40 +573,24 @@ def test_invitation_draft_is_private_until_published(client, signup):
 
 
 def test_invitation_validation(client, signup):
-    slug = _gallery(signup)
-    for bad in ({"names": " "}, {"date": "12/06/2027"}, {"time": "6pm"}, {"map_url": "javascript:alert(1)"}):
+    slug = _account(signup, "invite")["slug"]
+    for bad in ({"names": " "}, {"date": "12/06/2027"}, {"time": "6pm"}, {"map_url": "javascript:alert(1)"},
+                {"reception_map": "ftp://x"}):
         assert client.put(f"/api/e/{slug}/invitation", json={**_INVITE, **bad}).status_code == 422
+    odd = client.put(f"/api/e/{slug}/invitation", json={**_INVITE, "font": "comic-sans", "extra1_label": "x" * 99}).json()
+    assert odd["font"] == "classic" and len(odd["extra1_label"]) == 40
 
 
-def test_publish_needs_payment_or_code(client, signup, monkeypatch):
-    slug = _gallery(signup)
-    assert client.post(f"/api/e/{slug}/invitation/publish", json={}).status_code == 400  # nothing saved
+def test_invitation_live_with_addon_then_guests_rsvp(client, signup):
+    slug = _account(signup, "invite")["slug"]
     client.put(f"/api/e/{slug}/invitation", json=_INVITE)
-    # No invitation payment link yet: a clear message, still a draft.
-    assert client.post(f"/api/e/{slug}/invitation/publish", json={}).status_code == 503
-    assert client.post(f"/api/e/{slug}/invitation/publish", json={"access_code": "NOPE"}).status_code == 400
-
-    monkeypatch.setattr(config, "STRIPE_INVITE_LINK_URL", "https://buy.stripe.com/test_invite")
-    res = client.post(f"/api/e/{slug}/invitation/publish", json={}).json()
-    ev = _event(slug)
-    assert res["payment_url"].startswith("https://buy.stripe.com/test_invite")
-    assert f"client_reference_id=inv_{ev.id}" in res["payment_url"]
-
-    # Stripe confirms the invitation payment: it goes live, the gallery is untouched.
-    assert _stripe_webhook(client, _checkout_completed(f"inv_{ev.id}")).status_code == 200
-    assert client.get(f"/api/e/{slug}/invitation").json()["status"] == "active"
-    assert _event(slug).stripe_ref is None
-
-
-def test_publish_with_code_then_guests_rsvp(client, signup):
-    slug = _gallery(signup)
-    client.put(f"/api/e/{slug}/invitation", json=_INVITE)
-    assert client.post(f"/api/e/{slug}/invitation/publish", json={"access_code": "FREE-TEST"}).json()["status"] == "active"
+    assert client.get(f"/api/e/{slug}/invitation").json()["live"] is True
 
     couple_cookies = dict(client.cookies)
     client.cookies.clear()
     pub = client.get(f"/api/i/{slug}").json()
-    assert pub["preview"] is False and pub["venue"] == "Agios Georgios" and pub["upload_url"] == f"/e/{slug}"
+    assert pub["preview"] is False and pub["venue"] == "Agios Georgios" and pub["extra1_text"] == "Black tie"
+    assert pub["upload_url"] is None  # invitation only: no photo gallery to send guests to
 
     assert client.post(f"/api/i/{slug}/rsvp", json={"name": "Eleni K", "attending": True, "guests": 2,
                                                      "note": "Vegetarian"}).json() == {"ok": True, "updated": False}
@@ -563,17 +609,18 @@ def test_publish_with_code_then_guests_rsvp(client, signup):
     assert "Eleni K,Yes,3" in csv.text and "Marios,No,0" in csv.text and "'=HYPERLINK(1)" in csv.text
 
 
-def test_invitation_pages_load(client):
-    assert client.get("/e/abc/invite").status_code == 200
-    assert client.get("/i/abc").status_code == 200
-    assert client.get("/static/invite/envelope.mp4").status_code == 200
-
-
 def test_guest_page_link_preview_shows_names_only_when_live(client, signup):
-    slug = _gallery(signup)
+    slug = _account(signup, "photos")["slug"]
     client.put(f"/api/e/{slug}/invitation", json=_INVITE)
     assert "Sofia &amp; Daniel" not in client.get(f"/i/{slug}").text
-    client.post(f"/api/e/{slug}/invitation/publish", json={"access_code": "FREE-TEST"})
+    client.post(f"/api/e/{slug}/addon", json={"product": "invite", "access_code": "FREE-TEST"})
     page = client.get(f"/i/{slug}").text
     assert '<meta property="og:title" content="Sofia &amp; Daniel · You&#x27;re invited" />' in page
     assert "__OG_" not in page
+    assert client.get(f"/api/i/{slug}").json()["upload_url"] == f"/e/{slug}"  # has photos too
+
+
+def test_new_pages_load(client):
+    for path in ["/e/abc/invite", "/i/abc", "/e/abc/home", "/static/invite/envelope.mp4", "/static/invite/card.js"]:
+        assert client.get(path).status_code == 200, path
+    assert client.get("/e/nope/invite-qr.png").status_code == 404

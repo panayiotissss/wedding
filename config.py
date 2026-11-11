@@ -77,8 +77,10 @@ ALLOWED_TYPES = {
 # ── Stripe (optional) ──────────────────────────────────────────────────────
 STRIPE_PAYMENT_LINK_URL = _optional("STRIPE_PAYMENT_LINK_URL")
 STRIPE_WEBHOOK_SECRET   = _optional("STRIPE_WEBHOOK_SECRET")
-# WED-36/39: separate Payment Link for the Invitation + RSVP (€20).
+# WED-36/39: Payment Links for the Invitation + RSVP (€20) and the bundle (€39).
+# STRIPE_PAYMENT_LINK_URL above is the photo gallery (€25).
 STRIPE_INVITE_LINK_URL  = _optional("STRIPE_INVITE_LINK_URL")
+STRIPE_BUNDLE_LINK_URL  = _optional("STRIPE_BUNDLE_LINK_URL")
 
 # When Stripe isn't configured we fall back to stub mode: events activate
 # immediately on creation so the whole product is demoable without a Stripe

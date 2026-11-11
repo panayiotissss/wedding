@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Create your gallery · Confetti</title>
+  <title>Get started · Confetti</title>
   <meta name="theme-color" content="#FBF7F2" />
   <link rel="icon" href="/static/favicon.svg" type="image/svg+xml" />
   <link rel="apple-touch-icon" href="/static/favicon.svg" />
@@ -33,6 +33,17 @@
     .rules li.ok { color: var(--ok); }
     .rules li.ok::before { content: "✓ "; }
     .suggest { font-size: .82rem; margin-top: .35rem; color: var(--ink-soft); display: none; }
+    .plans { display: grid; gap: .55rem; margin-bottom: 1.4rem; }
+    .plan { display: flex; align-items: center; gap: .8rem; padding: .85rem 1rem; border: 1.5px solid var(--line); border-radius: 14px;
+      background: #FFFDFB; cursor: pointer; text-align: left; font: inherit; color: var(--ink); width: 100%; position: relative; }
+    .plan[aria-checked="true"] { border-color: var(--accent); background: var(--accent-soft); }
+    .plan .dot { width: 18px; height: 18px; border-radius: 50%; border: 1.5px solid #CDBFB3; flex-shrink: 0; }
+    .plan[aria-checked="true"] .dot { border: 5px solid var(--accent); }
+    .plan b { display: block; font-size: .98rem; }
+    .plan small { color: var(--muted); font-size: .8rem; line-height: 1.35; display: block; }
+    .plan .price { margin-left: auto; font-weight: 700; font-size: 1.05rem; white-space: nowrap; }
+    .plan .tag { position: absolute; top: -9px; right: 12px; background: var(--gold); color: #3B2A10; font-size: .68rem; font-weight: 700;
+      letter-spacing: .04em; padding: .1rem .5rem; border-radius: 999px; }
     .suggest button { background: none; border: 0; color: var(--accent); font-weight: 600; cursor: pointer; font-size: inherit; padding: 0; text-decoration: underline; }
   </style>
 </head>
@@ -44,12 +55,19 @@
 </header>
 
 <main class="narrow">
-  <div class="stepper"><span class="on">1 · Your details</span><span>2 · Payment</span><span>3 · Your QR code</span></div>
+  <div class="stepper"><span class="on">1 · Your details</span><span>2 · Payment</span><span>3 · You're set</span></div>
   <div class="card">
-    <h1 class="page-title">Create your gallery</h1>
+    <h1 class="page-title">Get started</h1>
     <p class="page-sub">Takes about a minute.</p>
-
     <form id="form" novalidate>
+      <div class="plans" role="radiogroup" aria-label="What would you like?">
+        <button type="button" class="plan" role="radio" data-plan="photos" aria-checked="true"><span class="dot"></span>
+          <span><b>Photo gallery</b><small>Guests scan a QR code and their photos land in one private gallery.</small></span><span class="price">€25</span></button>
+        <button type="button" class="plan" role="radio" data-plan="invite" aria-checked="false"><span class="dot"></span>
+          <span><b>Invitation + RSVP</b><small>An animated envelope invitation. Guests reply in one tap.</small></span><span class="price">€20</span></button>
+        <button type="button" class="plan" role="radio" data-plan="bundle" aria-checked="false"><span class="tag">SAVE €6</span><span class="dot"></span>
+          <span><b>Both</b><small>The invitation before the wedding, the photo gallery on the day.</small></span><span class="price">€39</span></button>
+      </div>
       <div class="field-row">
         <div class="field">
           <label class="label" for="name1">Your name <span class="req">*</span></label>
@@ -70,7 +88,7 @@
       </div>
 
       <div class="field">
-        <label class="label" for="password">Gallery password <span class="req">*</span></label>
+        <label class="label" for="password">Password <span class="req">*</span></label>
         <div class="pw-wrap">
           <input class="input" type="password" id="password" placeholder="At least 8 characters" autocomplete="new-password" required />
           <button type="button" class="pw-toggle" id="pwToggle">Show</button>
@@ -79,7 +97,7 @@
         <ul class="rules">
           <li id="rLen">8+ characters</li><li id="rLetter">A letter</li><li id="rNum">A number</li>
         </ul>
-        <p class="hint">Only people with this password can see your photos.</p>
+        <p class="hint">You'll log in with your email and this password.</p>
       </div>
 
       <div class="field" id="codeField">
@@ -89,7 +107,7 @@
       <p style="text-align:right; margin:-.4rem 0 .25rem"><button type="button" class="link-btn" id="codeToggle">Have an access code?</button></p>
 
       <div class="summary" id="summary">
-        <span>Wedding Gallery · 12 months</span>
+        <span id="summaryLabel">Photo gallery · 12 months</span>
         <strong id="summaryPrice">€25</strong>
       </div>
 
@@ -100,7 +118,7 @@
       <div class="alert alert-error" id="error" role="alert"></div>
     </form>
   </div>
-  <p class="foot-note">Already have a gallery? <a href="/login">Log in</a></p>
+  <p class="foot-note">Already have an account? <a href="/login">Log in</a></p>
 </main>
 
 <script>
@@ -112,7 +130,24 @@
   function showError(msg) { errorEl.innerHTML = msg; errorEl.classList.add("show"); }
   function hideError() { errorEl.classList.remove("show"); }
 
-  function idleLabel() { return codeEl.value.trim() ? "Create my gallery" : "Continue to payment"; }
+  function idleLabel() { return codeEl.value.trim() ? "Create my account" : "Continue to payment"; }
+
+  // Photos, invitation or both (?plan=invite|bundle preselects).
+  const PLAN_INFO = {
+    photos: ["Photo gallery · 12 months", "€25"],
+    invite: ["Invitation + RSVP", "€20"],
+    bundle: ["Invitation + photo gallery", "€39"],
+  };
+  let plan = new URLSearchParams(location.search).get("plan");
+  if (!PLAN_INFO[plan]) plan = "photos";
+  function setPlan(p) {
+    plan = p;
+    document.querySelectorAll(".plan").forEach((b) => b.setAttribute("aria-checked", String(b.dataset.plan === p)));
+    $("summaryLabel").textContent = PLAN_INFO[p][0];
+    $("summaryPrice").textContent = PLAN_INFO[p][1];
+  }
+  document.querySelectorAll(".plan").forEach((b) => b.addEventListener("click", () => setPlan(b.dataset.plan)));
+  setPlan(plan);
 
   // Live preview of how the names will appear on their pages.
   function updatePreview() {
@@ -215,11 +250,11 @@
       const res = await fetch("/api/events", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ couple_names, password, email, access_code: codeEl.value.trim() || null }),
+        body: JSON.stringify({ couple_names, password, email, plan, access_code: codeEl.value.trim() || null }),
       });
 
       if (res.status === 409) {
-        showError('That email already has a gallery. <a href="/login">Log in instead</a>.');
+        showError('That email already has an account. <a href="/login">Log in instead</a>.');
         btn.disabled = false;
         btn.textContent = idleLabel();
         return;

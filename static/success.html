@@ -47,6 +47,12 @@
       <h1 class="page-title">You're all set! 🎉</h1>
       <p class="page-sub" id="readySub">Your gallery is live.</p>
 
+      <div id="inviteBlock" hidden style="text-align:center;margin-bottom:1.5rem">
+        <img src="/static/invite/envelope-start.jpg" alt="" style="width:120px;height:213px;object-fit:cover;border-radius:14px;margin:0 auto 1rem;box-shadow:var(--shadow)" />
+        <a class="btn btn-block" id="openInvite" href="#">Create my invitation</a>
+      </div>
+
+      <div id="photosBlock">
       <div class="qr-card">
         <img id="qrImg" alt="Your QR code" />
         <div class="qr-cta">Scan to share your photos</div>
@@ -66,6 +72,7 @@
           <li>Open your gallery during and after the wedding to see photos arrive.</li>
         </ol>
       </div>
+      </div>
     </div>
   </div>
 </main>
@@ -78,12 +85,13 @@
   const ready   = document.getElementById("ready");
 
   let slug = params.get("slug");
+  let waitFor = null;  // an add-on bought from inside the account: wait for it
 
   // After a Stripe Payment Link, the return URL has no slug, so recover the
   // gallery this session just created.
   (async () => {
     if (!slug) {
-      try { slug = (await (await fetch("/api/my-latest")).json()).slug; } catch {}
+      try { const l = await (await fetch("/api/my-latest")).json(); slug = l.slug; waitFor = l.addon; } catch {}
     }
     if (!slug) {
       waiting.innerHTML = "We couldn't find your gallery. <a href='/login'>Log in</a> or <a href='/create'>start again</a>.";
@@ -97,7 +105,7 @@
       const res = await fetch(`/api/events/${slug}/status`);
       if (res.ok) {
         const info = await res.json();
-        if (info.status === "active") return showReady(info);
+        if (info.status === "active" && (!waitFor || info[waitFor])) return showReady(info);
       }
     } catch { /* retry */ }
     setTimeout(poll, 2500);
@@ -106,10 +114,12 @@
   function showReady(info) {
     const galleryUrl = `${location.origin}/e/${slug}/gallery`;
 
-    if (info.names) {
-      document.getElementById("readySub").textContent = `${info.names}, your gallery is live.`;
-      document.getElementById("qrNames").textContent = info.names;
-    }
+    const what = info.photos && info.invite ? "invitation and gallery are" : info.invite ? "invitation is" : "gallery is";
+    document.getElementById("readySub").textContent = `${info.names ? info.names + ", your" : "Your"} ${what} ready.`;
+    if (info.names) document.getElementById("qrNames").textContent = info.names;
+    document.getElementById("photosBlock").hidden = !info.photos;
+    document.getElementById("inviteBlock").hidden = !info.invite;
+    document.getElementById("openInvite").href = `/e/${slug}/invite`;
     document.getElementById("qrImg").src = `/e/${slug}/qr.png`;
     document.getElementById("qrDownload").href = `/e/${slug}/qr.png`;
     document.getElementById("openGallery").href = galleryUrl;

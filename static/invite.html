@@ -12,7 +12,7 @@
   <link rel="icon" href="/static/favicon.svg" type="image/svg+xml" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Pinyon+Script&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Great+Vibes&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/static/app.css" />
   <link rel="preload" as="image" href="/static/invite/envelope-start.jpg" />
   <style>
@@ -36,28 +36,15 @@
       transition: opacity .6s; cursor: pointer; border: 0; color: inherit; font: inherit; width: 100%; }
     .gate.gone { opacity: 0; pointer-events: none; }
     .gate small { font-size: 3.4cqw; letter-spacing: .32em; text-transform: uppercase; opacity: .85; }
-    .gate strong { font-family: "Pinyon Script", cursive; font-weight: 400; font-size: 11cqw; line-height: 1.25; margin: 1cqw 0 5cqw;
+    .gate strong { font-family: "Great Vibes", cursive; font-weight: 400; font-size: 11cqw; line-height: 1.25; margin: 1cqw 0 5cqw;
       text-shadow: 0 2px 18px rgba(0,0,0,.5); text-align: center; padding: 0 6cqw; }
     .gate .pill { display: inline-flex; align-items: center; gap: .6em; padding: 3.4cqw 7cqw; border-radius: 999px;
       background: rgba(246,239,228,.14); border: 1px solid rgba(246,239,228,.45); backdrop-filter: blur(6px);
       -webkit-backdrop-filter: blur(6px); font-size: 4cqw; letter-spacing: .08em; animation: breathe 2.4s ease-in-out infinite; }
     @keyframes breathe { 50% { transform: scale(1.04); background: rgba(246,239,228,.22); } }
 
-    /* Text written onto the blank card in the last frame (card: 14.2-89.2% x, 31.7-63.1% y). */
-    .card-text { position: absolute; left: 14.2%; width: 75%; top: 31.7%; height: 31.4%;
-      display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;
-      padding: 0 7cqw; color: #2E2620; pointer-events: none; }
-    .card-text > * { opacity: 0; transform: translateY(6px); transition: opacity 1s ease, transform 1s ease; }
-    .card-text.show > * { opacity: 1; transform: none; }
-    .card-text.show > :nth-child(2) { transition-delay: .35s; }
-    .card-text.show > :nth-child(3) { transition-delay: .9s; }
-    .card-text.show > :nth-child(4) { transition-delay: 1.2s; }
-    .card-text.show > :nth-child(5) { transition-delay: 1.5s; }
-    .ct-top { font-size: 2.2cqw; letter-spacing: .28em; text-transform: uppercase; color: #8A6D3B; }
-    .ct-names { font-family: "Pinyon Script", cursive; font-size: 9cqw; line-height: 1.15; margin: 1.6cqw 0 .6cqw; white-space: nowrap; }
-    .ct-line { font-family: "Cormorant Garamond", Georgia, serif; font-style: italic; font-size: 3cqw; color: #5C514A; }
-    .ct-date { font-size: 2.4cqw; letter-spacing: .22em; text-transform: uppercase; margin-top: 2.2cqw; color: #2E2620; font-weight: 500; }
-    .ct-venue { font-family: "Cormorant Garamond", Georgia, serif; font-size: 3.6cqw; font-weight: 600; margin-top: .8cqw; }
+    /* The blank card in the video's last frame: 14.2-89.2% across, 31.7-63.1% down. */
+    .card-host { position: absolute; left: 14.2%; width: 75%; top: 31.7%; height: 31.4%; }
 
     /* Below the card: message + actions */
     .below { position: absolute; left: 8%; right: 8%; top: 67%; bottom: 3%; display: flex; flex-direction: column;
@@ -116,20 +103,15 @@
   </video>
   <img class="still" id="still" src="/static/invite/envelope-end.jpg" alt="" />
 
-  <div class="card-text" id="cardText" aria-live="polite">
-    <div class="ct-top">Together with their families</div>
-    <div class="ct-names" id="ctNames"></div>
-    <div class="ct-line">request the pleasure of your company</div>
-    <div class="ct-date" id="ctDate"></div>
-    <div class="ct-venue" id="ctVenue"></div>
-  </div>
+  <div class="card-host" id="cardHost" aria-live="polite"></div>
 
   <div class="below" id="below">
     <div class="msg" id="msg"></div>
     <button class="gold" id="rsvpBtn" type="button">RSVP</button>
     <div class="by" id="by"></div>
     <div class="row">
-      <a class="ghost" id="mapBtn" target="_blank" rel="noopener" hidden>Map</a>
+      <a class="ghost" id="mapBtn" target="_blank" rel="noopener" hidden>Ceremony map</a>
+      <a class="ghost" id="map2Btn" target="_blank" rel="noopener" hidden>Reception map</a>
       <a class="ghost" id="photosBtn" hidden>Share your photos</a>
     </div>
   </div>
@@ -143,7 +125,7 @@
   </button>
 </div>
 
-<div class="preview-bar" id="previewBar" hidden>Preview: only you can see this. <a id="previewLink" href="#">Publish it</a> to share with guests.</div>
+<div class="preview-bar" id="previewBar" hidden>Preview: only you can see this until you add Invitation + RSVP. <a id="previewLink" href="#">Back to the editor</a></div>
 
 <div class="sheet-back" id="sheetBack"></div>
 <div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
@@ -186,6 +168,7 @@
 </div>
 
 <script src="/static/confetti.js"></script>
+<script src="/static/invite/card.js"></script>
 <script>
 "use strict";
 (async function () {
@@ -201,17 +184,19 @@
     inv = await r.json();
   } catch { $("missing").hidden = false; return; }
 
-  const fmtDate = (d) => d ? new Date(d + "T12:00:00").toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" }) : "";
+  const fmtDate = ConfettiCard.fmtDate;
   const dateLine = [fmtDate(inv.date), inv.time].filter(Boolean).join(" · ");
+  const font = ConfettiCard.FONTS[inv.font] || ConfettiCard.FONTS.classic;
 
   document.title = `${inv.names} · You're invited`;
   $("gateNames").textContent = inv.names;
-  $("ctNames").textContent = inv.names;
-  $("ctDate").textContent = dateLine;
-  $("ctVenue").textContent = inv.venue;
+  $("gateNames").style.fontFamily = font.names;
+  if (font.italic) $("gateNames").style.fontStyle = "italic";
   $("msg").textContent = inv.message;
   $("by").textContent = inv.rsvp_by ? "Kindly reply by " + new Date(inv.rsvp_by + "T12:00:00").toLocaleDateString("en-GB", { day: "numeric", month: "long" }) : "";
   if (inv.map_url) { $("mapBtn").href = inv.map_url; $("mapBtn").hidden = false; }
+  if (inv.reception_map) { $("map2Btn").href = inv.reception_map; $("map2Btn").hidden = false; }
+  if (inv.map_url && !inv.reception_map) $("mapBtn").textContent = "Map";
   const weddingDay = inv.date ? new Date(inv.date + "T00:00:00") : null;
   if (inv.upload_url && weddingDay && Date.now() >= weddingDay.getTime()) {
     $("photosBtn").href = inv.upload_url; $("photosBtn").hidden = false;
@@ -220,23 +205,15 @@
   if (inv.preview) { $("previewBar").hidden = false; $("previewLink").href = `/e/${slug}/invite`; }
   $("stage").hidden = false;
 
-  // Long names: shrink until they fit on the card.
-  function fitNames() {
-    const el = $("ctNames"), box = $("cardText");
-    el.style.fontSize = "";
-    let size = parseFloat(getComputedStyle(el).fontSize);
-    const max = box.clientWidth * 0.86;
-    while (el.scrollWidth > max && size > 10) { size -= 1; el.style.fontSize = size + "px"; }
-  }
-
   const vid = $("vid");
-  let revealed = false;
+  let revealed = false, card = null;
   function revealCard() {
     if (revealed) return;
     revealed = true;
-    fitNames();
-    $("cardText").classList.add("show");
-    setTimeout(() => { $("below").classList.add("show"); $("replay").hidden = false; }, reduce ? 0 : 1900);
+    card = ConfettiCard.render($("cardHost"), inv, { animate: !reduce });
+    if (reduce) card.showAll(); else card.play();
+    // The details and RSVP button come in once the card has finished writing.
+    setTimeout(() => { $("below").classList.add("show"); $("replay").hidden = false; }, reduce ? 0 : Math.min(card.duration, 9) * 1000);
   }
   function showEnd() { $("still").classList.add("show"); revealCard(); }
 
@@ -255,16 +232,20 @@
 
   $("replay").addEventListener("click", () => {
     revealed = false;
-    $("cardText").classList.remove("show"); $("below").classList.remove("show");
+    $("cardHost").innerHTML = ""; $("below").classList.remove("show");
     $("still").classList.remove("show"); $("replay").hidden = true;
     vid.currentTime = 0; vid.play().catch(showEnd);
   });
-  addEventListener("resize", () => { if (revealed) fitNames(); });
+  addEventListener("resize", () => { if (card) card.fit(); });
 
   // ── RSVP ───────────────────────────────────────────────────────────
   const det = [];
   if (dateLine) det.push(`<div><b>When:</b> ${esc(dateLine)}</div>`);
-  if (inv.venue || inv.address) det.push(`<div><b>Where:</b> ${esc([inv.venue, inv.address].filter(Boolean).join(", "))}${inv.map_url ? ` · <a href="${esc(inv.map_url)}" target="_blank" rel="noopener">Map</a>` : ""}</div>`);
+  const mapLink = (u) => u ? ` · <a href="${esc(u)}" target="_blank" rel="noopener">Map</a>` : "";
+  if (inv.venue) det.push(`<div><b>Ceremony:</b> ${esc(inv.venue)}${mapLink(inv.map_url)}</div>`);
+  if (inv.reception) det.push(`<div><b>Reception:</b> ${esc(inv.reception)}${mapLink(inv.reception_map)}</div>`);
+  for (const [l, v] of [[inv.extra1_label, inv.extra1_text], [inv.extra2_label, inv.extra2_text]])
+    if (l || v) det.push(`<div>${l ? `<b>${esc(l)}:</b> ` : ""}${esc(v || "")}</div>`);
   $("details").innerHTML = det.join("");
   $("details").hidden = !det.length;
   $("sheetSub").textContent = $("by").textContent;

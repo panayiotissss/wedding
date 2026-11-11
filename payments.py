@@ -17,24 +17,25 @@ from urllib.parse import quote
 import config
 
 
-def payment_url(event) -> str:
-    """Build the redirect URL to Stripe's hosted Payment Link for this event."""
-    base = config.STRIPE_PAYMENT_LINK_URL or ""
-    sep = "&" if "?" in base else "?"
-    url = f"{base}{sep}client_reference_id={event.id}"
-    if event.contact_email:
-        url += f"&prefilled_email={quote(event.contact_email)}"
-    return url
-
-
+# Add-ons bought after signup carry a prefix so the webhook knows what was paid.
 INVITE_REF_PREFIX = "inv_"
+PHOTOS_REF_PREFIX = "pho_"
 
 
-def invite_payment_url(event) -> str:
-    """Payment Link for the invitation; the reference tells the webhook which product."""
-    base = config.STRIPE_INVITE_LINK_URL or ""
+def link_for(product: str) -> str:
+    """The Payment Link for a product: photos, invite or bundle ("" if not set up)."""
+    return {
+        "photos": config.STRIPE_PAYMENT_LINK_URL,
+        "invite": config.STRIPE_INVITE_LINK_URL,
+        "bundle": config.STRIPE_BUNDLE_LINK_URL,
+    }.get(product) or ""
+
+
+def payment_url(event, product: str | None = None, ref_prefix: str = "") -> str:
+    """Stripe's hosted Payment Link for this event, tagged with its id."""
+    base = link_for(product or event.plan or "photos")
     sep = "&" if "?" in base else "?"
-    url = f"{base}{sep}client_reference_id={INVITE_REF_PREFIX}{event.id}"
+    url = f"{base}{sep}client_reference_id={ref_prefix}{event.id}"
     if event.contact_email:
         url += f"&prefilled_email={quote(event.contact_email)}"
     return url

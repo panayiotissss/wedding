@@ -55,7 +55,7 @@
       background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-lg); padding: .75rem 1.1rem .75rem .75rem;
       margin-bottom: 1.5rem; box-shadow: var(--shadow); font-size: .9rem; }
     .invite-promo img { width: 44px; height: 78px; object-fit: cover; border-radius: 8px; flex-shrink: 0; }
-    .invite-promo span { flex: 1; }
+    .invite-promo > span { flex: 1; }
     .invite-promo b { display: block; color: var(--ink); font-size: 1rem; }
     .invite-promo em { font-style: normal; color: var(--accent); font-weight: 600; }
     .notice .btn-soft { background: var(--surface); }
@@ -179,8 +179,8 @@
 
   <a class="invite-promo" id="invitePromo" href="#">
     <img src="/static/invite/envelope-start.jpg" alt="" />
-    <span><b>Invitation + RSVP</b>Send guests an invitation that opens like a real envelope, and see who's coming.</span>
-    <em>Open</em>
+    <span><b id="promoTitle">Invitation + RSVP</b><span id="promoText">Send guests an invitation that opens like a real envelope, and see who's coming.</span></span>
+    <em id="promoGo">Try it</em>
   </a>
 
   <div class="notice" id="freeNotice" hidden>
@@ -224,6 +224,18 @@
   const SLUG = location.pathname.split("/")[2] || "";
   const API  = `/api/e/${SLUG}`;
   document.getElementById("invitePromo").href = `/e/${SLUG}/invite`;
+  // WED-36: what this account has. Invitation-only accounts don't have a gallery.
+  fetch(`${API}/account`).then((r) => r.ok ? r.json() : null).then((acc) => {
+    if (!acc) return;
+    if (!acc.photos) { location.replace(acc.home); return; }
+    if (acc.invite) {
+      document.getElementById("promoTitle").textContent = "Your invitation + RSVP";
+      document.getElementById("promoText").textContent = "Edit it, send it, and see who's coming.";
+      document.getElementById("promoGo").textContent = "Open";
+    } else {
+      document.getElementById("promoGo").textContent = "Try it free";
+    }
+  }).catch(() => {});
 
   // ── State ──────────────────────────────────────────────────────────────
 

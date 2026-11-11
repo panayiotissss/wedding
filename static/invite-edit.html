@@ -11,34 +11,39 @@
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/static/app.css" />
   <style>
-    main { max-width: 1040px; margin: 0 auto; padding: .5rem 1.25rem 4rem; }
+    main { max-width: 1060px; margin: 0 auto; padding: .5rem 1.25rem 4rem; }
     h1 { font-family: var(--serif); font-size: 2.4rem; font-weight: 600; line-height: 1.1; }
     .lead { color: var(--muted); margin: .3rem 0 1.5rem; }
     .grid { display: grid; gap: 1.25rem; grid-template-columns: 1fr; align-items: start; }
-    @media (min-width: 880px) { .grid { grid-template-columns: 1.25fr 1fr; } }
-    .card h2 { font-family: var(--serif); font-size: 1.6rem; font-weight: 600; margin-bottom: 1rem; }
-    .card { padding: 1.5rem 1.25rem; }
+    @media (min-width: 900px) { .grid { grid-template-columns: 1.2fr 1fr; } .side { position: sticky; top: 1rem; } }
+    .card { padding: 1.4rem 1.2rem; margin-bottom: 1.25rem; }
     @media (min-width: 520px) { .card { padding: 1.75rem 1.75rem; } }
-    .field-row { grid-template-columns: 1fr 1fr; }
-    textarea.input { resize: vertical; min-height: 90px; }
-    .theme { display: flex; gap: .9rem; align-items: center; border: 1.5px solid var(--accent); border-radius: var(--radius);
-      padding: .6rem; background: var(--accent-soft); margin-bottom: 1.1rem; }
-    .theme img { width: 54px; height: 96px; object-fit: cover; border-radius: 8px; }
-    .theme b { display: block; }
-    .theme span { font-size: .82rem; color: var(--muted); }
-    .actions { display: flex; gap: .6rem; flex-wrap: wrap; align-items: center; }
-    .status { display: inline-block; padding: .15rem .6rem; border-radius: 999px; font-size: .78rem; font-weight: 600; margin-left: .4rem; vertical-align: middle; }
-    .status.draft { background: var(--bg-deep); color: var(--muted); }
-    .status.active { background: var(--ok-soft); color: var(--ok); }
-    .phone { position: relative; width: 100%; max-width: 230px; aspect-ratio: 9/16; margin: 0 auto 1.25rem; border-radius: 22px; overflow: hidden;
-      background: #0B2219 url("/static/invite/envelope-end.jpg") center/cover; box-shadow: var(--shadow); }
-    .phone .pv { position: absolute; left: 14.2%; width: 75%; top: 31.7%; height: 31.4%; display: flex; flex-direction: column;
-      align-items: center; justify-content: center; text-align: center; color: #2E2620; container-type: inline-size; padding: 0 6%; }
-    .pv .n { font-family: "Pinyon Script", cursive; font-size: 11cqw; line-height: 1.2; white-space: nowrap; overflow: hidden; max-width: 100%; }
-    .pv .d { font-size: 3.6cqw; letter-spacing: .18em; text-transform: uppercase; margin-top: 2cqw; }
-    .pv .v { font-family: var(--serif); font-size: 5.4cqw; font-weight: 600; }
-    .linkbox { display: flex; gap: .5rem; margin: .75rem 0; }
-    .linkbox .input { font-family: ui-monospace, Menlo, monospace; font-size: .85rem; }
+    .card h2 { font-family: var(--serif); font-size: 1.6rem; font-weight: 600; margin-bottom: .3rem; }
+    .card .sub { color: var(--muted); font-size: .86rem; margin-bottom: 1.1rem; }
+    .group { border-top: 1px solid var(--line); padding-top: 1.1rem; margin-top: .3rem; }
+    .group h3 { font-size: .8rem; letter-spacing: .14em; text-transform: uppercase; color: var(--accent); margin-bottom: .8rem; }
+    textarea.input { resize: vertical; min-height: 84px; }
+    .opt { font-weight: 400; color: var(--muted); }
+
+    .fonts { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: .6rem; }
+    .font { border: 1.5px solid var(--line); border-radius: 14px; background: #FFFDFB; padding: .8rem .6rem .6rem; cursor: pointer; text-align: center; color: var(--ink); }
+    .font[aria-checked="true"] { border-color: var(--accent); background: var(--accent-soft); box-shadow: 0 0 0 3px rgba(158,79,69,.1); }
+    .font .n { display: block; font-size: 1.45rem; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #3A2C1F; }
+    .font small { display: block; font-size: .74rem; color: var(--muted); margin-top: .2rem; letter-spacing: .06em; text-transform: uppercase; }
+
+    .phone { position: relative; width: 100%; max-width: 270px; aspect-ratio: 9/16; margin: 0 auto 1rem; border-radius: 26px; overflow: hidden;
+      background: #0B2219 url("/static/invite/envelope-end.jpg") center/cover; box-shadow: 0 18px 50px rgba(43,36,32,.22); }
+    .phone .host { position: absolute; left: 14.2%; width: 75%; top: 31.7%; height: 31.4%; }
+    .center { text-align: center; }
+    .actions { display: flex; gap: .55rem; flex-wrap: wrap; align-items: center; }
+    .actions.center { justify-content: center; }
+    .share-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem; margin-top: .75rem; }
+    .share-grid .btn { width: 100%; }
+    .linkbox { display: flex; gap: .5rem; }
+    .linkbox .input { font-family: ui-monospace, Menlo, monospace; font-size: .82rem; }
+    .how { background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: .8rem .95rem; font-size: .86rem; color: var(--ink-soft); margin: 0 0 1rem; }
+    .how ol { margin: .3rem 0 0 1.1rem; }
+
     .tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: .6rem; margin-bottom: 1rem; }
     .tile { background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: .7rem .8rem; }
     .tile b { display: block; font-size: 1.5rem; font-variant-numeric: tabular-nums; }
@@ -49,58 +54,99 @@
     .rsvp-list .yes { color: var(--ok); font-weight: 600; }
     .rsvp-list .no { color: var(--muted); font-weight: 600; }
     .rsvp-list .note { color: var(--ink-soft); font-size: .86rem; margin-top: .2rem; white-space: pre-wrap; }
-    .full { grid-column: 1 / -1; }
+    .savebar { position: sticky; bottom: 0; z-index: 20; display: flex; gap: .6rem; align-items: center; padding: .8rem 0;
+      background: linear-gradient(180deg, rgba(255,255,255,0), #fff 35%); }
   </style>
-  <link href="https://fonts.googleapis.com/css2?family=Pinyon+Script&display=swap" rel="stylesheet" />
 </head>
 <body>
 <header class="topbar">
   <a href="/" class="brand"><img src="/static/favicon.svg" alt="" /><span>Confetti</span></a>
-  <nav class="nav"><a class="nav-link" id="backLink" href="#">← Gallery</a></nav>
+  <nav class="nav"><a class="nav-link" id="backLink" href="#" hidden></a><a class="nav-link" id="logout" href="#">Log out</a></nav>
 </header>
 <main>
-  <h1>Your invitation <span class="status draft" id="statusPill">Draft</span></h1>
-  <p class="lead">Guests open a sealed envelope, your names appear on the card, and they reply in one tap.</p>
+  <h1>Your invitation</h1>
+  <p class="lead">Guests open a sealed envelope, your card writes itself, and they reply in one tap.</p>
 
   <div class="grid">
-    <form class="card" id="form" novalidate>
-      <h2>Details</h2>
-      <div class="theme"><img src="/static/invite/envelope-start.jpg" alt="" /><div><b>Emerald envelope</b><span>Wax seal, damask lining, gold-edged card. More themes coming soon.</span></div></div>
-      <div class="field"><label class="label" for="names">Your names</label><input class="input" id="names" maxlength="120" placeholder="Sofia & Daniel" /></div>
-      <div class="field-row">
-        <div class="field"><label class="label" for="date">Date</label><input class="input" id="date" type="date" /></div>
-        <div class="field"><label class="label" for="time">Time</label><input class="input" id="time" type="time" /></div>
-      </div>
-      <div class="field"><label class="label" for="venue">Venue</label><input class="input" id="venue" maxlength="120" placeholder="Agios Georgios Church" /></div>
-      <div class="field"><label class="label" for="address">Address</label><input class="input" id="address" maxlength="200" placeholder="Paphos, Cyprus" /></div>
-      <div class="field"><label class="label" for="map_url">Map link <span style="font-weight:400;color:var(--muted)">(optional)</span></label><input class="input" id="map_url" maxlength="500" placeholder="https://maps.app.goo.gl/..." /></div>
-      <div class="field"><label class="label" for="message">A short message <span style="font-weight:400;color:var(--muted)">(optional)</span></label><textarea class="input" id="message" maxlength="600" placeholder="We can't wait to celebrate with you."></textarea></div>
-      <div class="field"><label class="label" for="rsvp_by">Reply by <span style="font-weight:400;color:var(--muted)">(optional)</span></label><input class="input" id="rsvp_by" type="date" /></div>
-      <div class="actions">
-        <button class="btn" type="submit" id="saveBtn">Save</button>
-        <a class="btn btn-ghost" id="previewBtn" target="_blank" rel="noopener">Preview ↗</a>
-        <span class="hint" id="saveMsg"></span>
-      </div>
-      <div class="alert alert-error" id="formErr"></div>
-    </form>
+    <form id="form" novalidate>
+      <section class="card">
+        <h2>Fonts</h2>
+        <p class="sub">How your names are written on the card.</p>
+        <div class="fonts" id="fonts" role="radiogroup" aria-label="Font"></div>
+      </section>
 
-    <div>
-      <section class="card" style="margin-bottom:1.25rem">
-        <div class="phone"><div class="pv"><div class="n" id="pvNames"></div><div class="d" id="pvDate"></div><div class="v" id="pvVenue"></div></div></div>
-
-        <div id="draftBox">
-          <h2>Send it to your guests</h2>
-          <p class="hint" style="margin:-.5rem 0 1rem">Save and preview as much as you like. Publish when you're ready: €20, once, unlimited guests.</p>
-          <div class="field"><label class="label" for="code">Access code <span style="font-weight:400;color:var(--muted)">(if you have one)</span></label><input class="input" id="code" autocomplete="off" /></div>
-          <button class="btn btn-block" type="button" id="publishBtn">Publish invitation</button>
-          <div class="alert alert-error" id="pubErr"></div>
+      <section class="card">
+        <h2>On the card</h2>
+        <p class="sub">Everything here is written onto the card in the video.</p>
+        <div class="field"><label class="label" for="names">Your names</label><input class="input" id="names" maxlength="120" placeholder="Sofia & Daniel" /></div>
+        <div class="field-row">
+          <div class="field"><label class="label" for="date">Date</label><input class="input" id="date" type="date" /></div>
+          <div class="field"><label class="label" for="time">Time</label><input class="input" id="time" type="time" /></div>
         </div>
 
-        <div id="liveBox" hidden>
-          <h2>It's live</h2>
-          <p class="hint" style="margin:-.5rem 0 0">Send this link by WhatsApp, Viber, email, or print it as a QR code.</p>
+        <div class="group">
+          <h3>Ceremony</h3>
+          <div class="field"><label class="label" for="venue">Where</label><input class="input" id="venue" maxlength="120" placeholder="Agios Georgios Church, Paphos" /></div>
+          <div class="field"><label class="label" for="map_url">Map link <span class="opt">(optional)</span></label><input class="input" id="map_url" maxlength="500" placeholder="https://maps.app.goo.gl/..." /></div>
+        </div>
+
+        <div class="group">
+          <h3>Reception</h3>
+          <div class="field"><label class="label" for="reception">Where</label><input class="input" id="reception" maxlength="120" placeholder="Elysium Hotel, Paphos" /></div>
+          <div class="field"><label class="label" for="reception_map">Map link <span class="opt">(optional)</span></label><input class="input" id="reception_map" maxlength="500" placeholder="https://maps.app.goo.gl/..." /></div>
+        </div>
+
+        <div class="group">
+          <h3>Your own lines <span class="opt" style="text-transform:none;letter-spacing:0">(optional)</span></h3>
+          <div class="field-row">
+            <div class="field"><label class="label" for="extra1_label">Title</label><input class="input" id="extra1_label" maxlength="40" placeholder="Dress code" /></div>
+            <div class="field"><label class="label" for="extra1_text">Text</label><input class="input" id="extra1_text" maxlength="120" placeholder="Black tie" /></div>
+          </div>
+          <div class="field-row">
+            <div class="field"><label class="label" for="extra2_label">Title</label><input class="input" id="extra2_label" maxlength="40" placeholder="After party" /></div>
+            <div class="field"><label class="label" for="extra2_text">Text</label><input class="input" id="extra2_text" maxlength="120" placeholder="Beach bar, 23:00" /></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Under the card</h2>
+        <p class="sub">Shown below the card, with the RSVP button.</p>
+        <div class="field"><label class="label" for="message">A short message <span class="opt">(optional)</span></label><textarea class="input" id="message" maxlength="600" placeholder="We can't wait to celebrate with you."></textarea></div>
+        <div class="field"><label class="label" for="rsvp_by">Reply by <span class="opt">(optional)</span></label><input class="input" id="rsvp_by" type="date" /></div>
+        <div class="savebar">
+          <button class="btn" type="submit" id="saveBtn">Save</button>
+          <a class="btn btn-ghost" id="previewBtn" target="_blank" rel="noopener">Play preview ↗</a>
+          <span class="hint" id="saveMsg"></span>
+        </div>
+        <div class="alert alert-error" id="formErr"></div>
+      </section>
+    </form>
+
+    <div class="side">
+      <section class="card">
+        <div class="phone"><div class="host" id="pvHost"></div></div>
+
+        <div id="shareBox" hidden>
+          <h2>Send it to your guests</h2>
+          <div class="how">Guests get one link, by WhatsApp, Viber, SMS or email:
+            <ol><li>They tap it. The preview shows your envelope and names.</li><li>They tap the envelope: it opens and your card writes itself.</li><li>They press RSVP. You see their reply below.</li></ol>
+          </div>
           <div class="linkbox"><input class="input" id="guestUrl" readonly /><button class="btn btn-soft btn-sm" type="button" id="copyBtn">Copy</button></div>
-          <div class="actions"><a class="btn btn-sm" id="waBtn" target="_blank" rel="noopener">Share on WhatsApp</a></div>
+          <div class="share-grid">
+            <a class="btn btn-sm" id="waBtn" target="_blank" rel="noopener">WhatsApp</a>
+            <a class="btn btn-sm btn-ghost" id="viberBtn">Viber</a>
+            <a class="btn btn-sm btn-ghost" id="mailBtn">Email</a>
+            <a class="btn btn-sm btn-ghost" id="smsBtn">SMS</a>
+            <button class="btn btn-sm btn-ghost" type="button" id="nativeBtn" hidden>More…</button>
+            <a class="btn btn-sm btn-ghost" id="qrBtn" download="invitation_qr.png">QR code</a>
+          </div>
+        </div>
+
+        <div id="buyBox" hidden>
+          <h2>Ready to send it?</h2>
+          <p class="sub">Design and preview for free. Add Invitation + RSVP to get your guest link: €20, one-time, unlimited guests.</p>
+          <button class="btn btn-block" type="button" id="buyBtn">Add Invitation + RSVP · €20</button>
         </div>
       </section>
 
@@ -113,90 +159,113 @@
         </div>
         <ul class="rsvp-list" id="rsvpList"></ul>
         <p class="hint" id="rsvpEmpty">No replies yet. They'll appear here as guests answer.</p>
-        <div class="actions" style="margin-top:1rem"><a class="btn btn-ghost btn-sm" id="csvBtn">Download as spreadsheet (CSV)</a></div>
+        <div class="actions" style="margin-top:1rem"><a class="btn btn-ghost btn-sm" id="csvBtn" hidden>Download as spreadsheet (CSV)</a></div>
       </section>
     </div>
   </div>
 </main>
 
 <script src="/static/dialog.js"></script>
-<script src="/static/confetti.js"></script>
+<script src="/static/account.js"></script>
+<script src="/static/invite/card.js"></script>
 <script>
 "use strict";
 (async function () {
   const $ = (id) => document.getElementById(id);
   const slug = location.pathname.split("/")[2];
   const API = `/api/e/${encodeURIComponent(slug)}`;
-  const FIELDS = ["names", "date", "time", "venue", "address", "map_url", "message", "rsvp_by"];
+  const FIELDS = ["names", "date", "time", "venue", "map_url", "reception", "reception_map",
+                  "extra1_label", "extra1_text", "extra2_label", "extra2_text", "message", "rsvp_by"];
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const errMsg = (d, fallback) => Array.isArray(d.detail) ? d.detail[0].msg.replace(/^Value error, /, "") : (d.detail || fallback);
 
-  $("backLink").href = `/e/${slug}/gallery`;
-  $("previewBtn").href = `/i/${slug}`;
-  $("csvBtn").href = `${API}/rsvps.csv`;
-
   const res = await fetch(`${API}/invitation`);
-  if (res.status === 401) { location.href = `/e/${slug}/gallery`; return; }
+  if (res.status === 401) { location.href = "/login"; return; }
   let inv = await res.json();
+  let font = inv.font || "classic";
   FIELDS.forEach((f) => { $(f).value = inv[f] || ""; });
-  let saved = JSON.stringify(values());
 
-  function values() { const o = {}; FIELDS.forEach((f) => { o[f] = $(f).value; }); return o; }
-  function renderPreview() {
-    const v = values();
-    $("pvNames").textContent = v.names || "Your names";
-    $("pvDate").textContent = v.date ? new Date(v.date + "T12:00:00").toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" }) : "";
-    $("pvVenue").textContent = v.venue;
+  // Navigation: home if they have both, gallery if they have photos.
+  if (inv.has_photos) {
+    $("backLink").hidden = false;
+    $("backLink").textContent = inv.has_invite ? "← Home" : "← Gallery";
+    $("backLink").href = inv.has_invite ? `/e/${slug}/home` : `/e/${slug}/gallery`;
   }
-  function renderStatus() {
-    const live = inv.status === "active";
-    $("statusPill").textContent = live ? "Live" : "Draft";
-    $("statusPill").className = "status " + (live ? "active" : "draft");
-    $("draftBox").hidden = live; $("liveBox").hidden = !live;
-    $("guestUrl").value = inv.guest_url;
-    const text = `${values().names || "We"} would love for you to join us. Open your invitation: ${inv.guest_url}`;
+  $("logout").onclick = async (e) => { e.preventDefault(); await fetch(`${API}/logout`, { method: "POST" }); location.href = "/login"; };
+
+  // Fonts picker: each option shows the couple's own names.
+  const fontsEl = $("fonts");
+  Object.entries(ConfettiCard.FONTS).forEach(([key, f]) => {
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "font"; b.dataset.font = key; b.setAttribute("role", "radio");
+    b.innerHTML = `<span class="n"></span><small>${f.label}</small>`;
+    b.querySelector(".n").style.fontFamily = f.names;
+    if (f.italic) b.querySelector(".n").style.fontStyle = "italic";
+    b.onclick = () => { font = key; markFont(); renderPreview(); dirty(); };
+    fontsEl.appendChild(b);
+  });
+  function markFont() {
+    fontsEl.querySelectorAll(".font").forEach((b) => b.setAttribute("aria-checked", String(b.dataset.font === font)));
+    const n = $("names").value.trim() || "Sofia & Daniel";
+    fontsEl.querySelectorAll(".font .n").forEach((el) => { el.textContent = n; });
+  }
+
+  function values() { const o = { font }; FIELDS.forEach((f) => { o[f] = $(f).value; }); return o; }
+  let saved = inv.saved ? JSON.stringify(values()) : null;
+  function dirty() { $("saveMsg").textContent = JSON.stringify(values()) === saved ? "Saved" : ""; }
+
+  let pv = null;
+  function renderPreview() { pv = ConfettiCard.render($("pvHost"), values(), { animate: false }); }
+  markFont(); renderPreview(); dirty();
+  FIELDS.forEach((f) => $(f).addEventListener("input", () => { renderPreview(); if (f === "names") markFont(); dirty(); }));
+  addEventListener("resize", () => pv && pv.fit());
+
+  function renderShare() {
+    const live = inv.has_invite;
+    $("shareBox").hidden = !live; $("buyBox").hidden = live;
+    $("rsvpCard").hidden = !live;
+    if (!live) return;
+    const url = inv.guest_url;
+    const names = values().names || "We";
+    const text = `${names} would love you to join us. Tap to open your invitation: ${url}`;
+    $("guestUrl").value = url;
     $("waBtn").href = "https://wa.me/?text=" + encodeURIComponent(text);
+    $("viberBtn").href = "viber://forward?text=" + encodeURIComponent(text);
+    $("smsBtn").href = "sms:?&body=" + encodeURIComponent(text);
+    $("mailBtn").href = "mailto:?subject=" + encodeURIComponent(`You're invited: ${names}`) + "&body=" + encodeURIComponent(text);
+    $("qrBtn").href = `/e/${slug}/invite-qr.png`;
+    if (navigator.share) {
+      $("nativeBtn").hidden = false;
+      $("nativeBtn").onclick = () => navigator.share({ title: `You're invited: ${names}`, text, url }).catch(() => {});
+    }
   }
-  renderPreview(); renderStatus();
-  FIELDS.forEach((f) => $(f).addEventListener("input", () => { renderPreview(); $("saveMsg").textContent = ""; }));
+  renderShare();
 
   async function save() {
     $("formErr").classList.remove("show");
-    const r = await fetch(`${API}/invitation`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(values()) });
+    const v = values();
+    const r = await fetch(`${API}/invitation`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(v) });
     const d = await r.json().catch(() => ({}));
     if (!r.ok) { $("formErr").textContent = errMsg(d, "Couldn't save. Please try again."); $("formErr").classList.add("show"); return false; }
-    saved = JSON.stringify(values());
-    $("saveMsg").textContent = "Saved";
+    saved = JSON.stringify(v);
+    dirty();
     return true;
   }
   $("form").addEventListener("submit", async (e) => { e.preventDefault(); $("saveBtn").disabled = true; await save(); $("saveBtn").disabled = false; });
-  // Preview shows what's saved, so save first.
+  $("previewBtn").href = `/i/${slug}`;
   $("previewBtn").addEventListener("click", async (e) => {
-    if (JSON.stringify(values()) === saved && inv.names) return;
+    if (JSON.stringify(values()) === saved) return;
     e.preventDefault();
     const w = window.open("", "_blank");
     if (await save()) { if (w) w.location = `/i/${slug}`; else location.href = `/i/${slug}`; } else if (w) w.close();
   });
+  // Unsaved changes would be lost when sharing or leaving.
+  for (const id of ["waBtn", "viberBtn", "smsBtn", "mailBtn", "copyBtn", "nativeBtn"]) {
+    $(id).addEventListener("click", () => { if (JSON.stringify(values()) !== saved) save(); }, true);
+  }
   addEventListener("beforeunload", (e) => { if (JSON.stringify(values()) !== saved) { e.preventDefault(); e.returnValue = ""; } });
 
-  $("publishBtn").addEventListener("click", async () => {
-    $("pubErr").classList.remove("show");
-    const v = values();
-    if (!v.date || !v.venue) {
-      return ConfettiDialog.alert({ title: "Almost there", body: "Add the date and the venue before you publish, so guests know where to go." });
-    }
-    if (!await save()) return;
-    const code = $("code").value.trim();
-    if (!code && !await ConfettiDialog.confirm({ title: "Publish your invitation?", body: "You'll go to a secure checkout for €20. Your guest link works as soon as the payment is done.", ok: "Continue to payment" })) return;
-    $("publishBtn").disabled = true;
-    const r = await fetch(`${API}/invitation/publish`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ access_code: code || null }) });
-    const d = await r.json().catch(() => ({}));
-    $("publishBtn").disabled = false;
-    if (!r.ok) { $("pubErr").textContent = errMsg(d, "Couldn't publish. Please try again."); $("pubErr").classList.add("show"); return; }
-    if (d.payment_url) { location.href = d.payment_url; return; }
-    inv.status = "active"; renderStatus();
-    if (window.confettiBurst) confettiBurst(90);
-  });
+  $("buyBtn").onclick = async () => { if (JSON.stringify(values()) === saved || await save()) ConfettiAccount.buy(slug, "invite"); };
 
   $("copyBtn").addEventListener("click", async () => {
     try { await navigator.clipboard.writeText(inv.guest_url); } catch { $("guestUrl").select(); document.execCommand("copy"); }
@@ -204,12 +273,14 @@
   });
 
   async function loadRsvps() {
+    if (!inv.has_invite) return;
     const r = await fetch(`${API}/rsvps`);
     if (!r.ok) return;
     const d = await r.json();
     $("tPeople").textContent = d.totals.people; $("tYes").textContent = d.totals.yes; $("tNo").textContent = d.totals.no;
     $("rsvpEmpty").hidden = d.rsvps.length > 0;
     $("csvBtn").hidden = d.rsvps.length === 0;
+    $("csvBtn").href = `${API}/rsvps.csv`;
     $("rsvpList").innerHTML = d.rsvps.map((x) => `<li><div class="top"><b>${esc(x.name)}</b>${x.attending
       ? `<span class="yes">Coming${x.guests > 1 ? " · " + x.guests : ""}</span>` : '<span class="no">Not coming</span>'}</div>${x.note ? `<div class="note">${esc(x.note)}</div>` : ""}</li>`).join("");
   }

@@ -143,7 +143,11 @@ def _grant_auth(request: Request, slug: str) -> None:
 
 
 def _activate(ev: Event) -> None:
-    """Mark an event paid & active, and set its 1-year expiry (WED-6)."""
+    """Mark an event paid & active, and set its 1-year expiry (WED-6).
+    Turns on what the couple bought at signup (photos, invitation or both)."""
+    plan = ev.plan or "photos"
+    ev.photos = bool(ev.photos) or plan in ("photos", "bundle")
+    ev.invite = bool(ev.invite) or plan in ("invite", "bundle")
     ev.status = "active"
     ev.paid_at = now_utc()
     ev.expires_at = ev.paid_at + timedelta(days=config.EVENT_TTL_DAYS)
@@ -161,7 +165,9 @@ def _send_welcome(ev: Event) -> None:
     if ev.contact_email:
         base = config.PUBLIC_BASE_URL
         mailer.welcome(ev.contact_email, ev.couple_names,
-                       f"{base}/e/{ev.slug}/gallery", f"{base}/e/{ev.slug}/qr.png")
+                       f"{base}/e/{ev.slug}/gallery" if ev.photos else None,
+                       f"{base}/e/{ev.slug}/qr.png" if ev.photos else None,
+                       f"{base}/e/{ev.slug}/invite" if ev.invite else None)
 
 
 def check_password_rules(v: str) -> str:
@@ -241,6 +247,11 @@ def event_upload_page(slug: str):
     return FileResponse("static/event.html")
 
 
+@app.get("/e/{slug}/home")
+def account_home_page(slug: str):
+    return FileResponse("static/home.html")
+
+
 @app.get("/e/{slug}/gallery")
 def event_gallery_page(slug: str):
     return FileResponse("static/gallery.html")
@@ -268,11 +279,31 @@ def _normalize_email(v: str) -> str:
     return v.strip().lower()
 
 
+PLANS = {"photos", "invite", "bundle"}
+
+
+def _home_url(ev: Event) -> str:
+    """Where a couple lands after login/payment: the one thing they have, or both."""
+    if ev.photos and ev.invite:
+        return f"/e/{ev.slug}/home"
+    if ev.invite:
+        return f"/e/{ev.slug}/invite"
+    return f"/e/{ev.slug}/gallery"
+
+
 class CreateEventRequest(BaseModel):
     couple_names: str
     password: str
     email: str                       # now REQUIRED — it's the login identifier
     access_code: str | None = None   # optional comp code (skips payment)
+    plan: str = "photos"             # photos (€25) | invite (€20) | bundle (€39)
+
+    @field_validator("plan")
+    @classmethod
+    def check_plan(cls, v: str) -> str:
+        if v not in PLANS:
+            raise ValueError("Choose photos, invitation or both.")
+        return v
 
     @field_validator("couple_names")
     @classmethod
@@ -334,6 +365,7 @@ def create_event(body: CreateEventRequest, request: Request, background: Backgro
     if ev:
         ev.couple_names = body.couple_names
         ev.password_hash = hash_password(body.password)
+        ev.plan = body.plan
     else:
         slug = _unique_slug(db)
         ev = Event(
@@ -342,6 +374,7 @@ def create_event(body: CreateEventRequest, request: Request, background: Backgro
             password_hash=hash_password(body.password),
             contact_email=email,
             status="pending_payment",
+            plan=body.plan,
             # Readable R2 folder: couple name + slug (slug guarantees uniqueness,
             # since two different couples can share the same names).
             storage_prefix=f"{slugify_names(body.couple_names)}-{slug}",
@@ -349,10 +382,13 @@ def create_event(body: CreateEventRequest, request: Request, background: Backgro
         )
 
     if config.PAYMENTS_ENABLED and not code_ok:
+        if not payments.link_for(body.plan):
+            raise HTTPException(status_code=503, detail="This option opens very soon. Use an access code for now.")
         db.add(ev)
         db.commit()
         _grant_auth(request, ev.slug)  # so the couple lands in their gallery after paying
         request.session["last_slug"] = ev.slug  # so /create/success works after the Stripe round-trip
+        request.session.pop("pending_addon", None)
         return {"slug": ev.slug, "status": ev.status, "payment_url": payments.payment_url(ev)}
 
     # Free path: stub mode (no Stripe) OR a valid comp code — unlock immediately.
@@ -366,7 +402,9 @@ def create_event(body: CreateEventRequest, request: Request, background: Backgro
     background.add_task(_send_welcome, ev)
     _grant_auth(request, ev.slug)
     request.session["last_slug"] = ev.slug
-    return {"slug": ev.slug, "status": ev.status, "payment_url": f"/create/success?slug={ev.slug}"}
+    request.session.pop("pending_addon", None)
+    return {"slug": ev.slug, "status": ev.status, "payment_url": f"/create/success?slug={ev.slug}",
+            "next": _home_url(ev)}
 
 
 class EmailLoginRequest(BaseModel):
@@ -386,7 +424,7 @@ def email_login(body: EmailLoginRequest, request: Request, db: Session = Depends
         raise HTTPException(status_code=401, detail="Wrong email or password")
     _grant_auth(request, ev.slug)
     request.session["last_slug"] = ev.slug
-    return {"slug": ev.slug}
+    return {"slug": ev.slug, "next": _home_url(ev) if ev.status == "active" else f"/e/{ev.slug}/gallery"}
 
 
 # ---------------------------------------------------------------------------
@@ -464,13 +502,14 @@ def reset_password(body: ResetRequest, request: Request, db: Session = Depends(g
 def my_latest(request: Request):
     """The gallery this browser session most recently created — lets the
     Stripe success page find it without a slug in the (static) return URL."""
-    return {"slug": request.session.get("last_slug")}
+    return {"slug": request.session.get("last_slug"), "addon": request.session.get("pending_addon")}
 
 
 @app.get("/api/events/{slug}/status")
 def event_status(slug: str, db: Session = Depends(get_db)):
     ev = get_event_or_404(db, slug)
-    return {"slug": ev.slug, "status": ev.status, "names": ev.couple_names}
+    return {"slug": ev.slug, "status": ev.status, "names": ev.couple_names,
+            "photos": bool(ev.photos), "invite": bool(ev.invite), "next": _home_url(ev)}
 
 
 @app.post("/api/stripe/webhook")
@@ -489,12 +528,17 @@ async def stripe_webhook(request: Request, background: BackgroundTasks,
     if event["type"] == "checkout.session.completed":
         session = event["data"]["object"]
         ref = session.get("client_reference_id")
-        if ref and ref.startswith(payments.INVITE_REF_PREFIX):
-            inv = db.get(Invitation, ref[len(payments.INVITE_REF_PREFIX):])
-            if inv and inv.status != "active":
-                inv.status = "active"
-                inv.paid_at = now_utc()
-                inv.stripe_ref = session.get("id")
+        addon = None
+        for prefix, product in ((payments.INVITE_REF_PREFIX, "invite"), (payments.PHOTOS_REF_PREFIX, "photos")):
+            if ref and ref.startswith(prefix):
+                addon, ref = product, ref[len(prefix):]
+        if addon:
+            # An add-on bought later from inside the account.
+            ev = db.query(Event).filter(Event.id == ref).first()
+            if ev:
+                setattr(ev, addon, True)
+                if ev.status != "active":
+                    _activate(ev)
                 db.commit()
         elif ref:
             ev = db.query(Event).filter(Event.id == ref).first()
@@ -514,7 +558,7 @@ async def stripe_webhook(request: Request, background: BackgroundTasks,
 @app.get("/api/e/{slug}/info")
 def event_info(slug: str, db: Session = Depends(get_db)):
     ev = get_event_or_404(db, slug)
-    return {"slug": ev.slug, "names": ev.couple_names, "active": ev.status == "active"}
+    return {"slug": ev.slug, "names": ev.couple_names, "active": ev.status == "active" and bool(ev.photos)}
 
 
 # ---------------------------------------------------------------------------
@@ -552,7 +596,7 @@ class UploadRequest(BaseModel):
 @app.post("/api/e/{slug}/upload-url")
 def get_upload_url(slug: str, body: UploadRequest, db: Session = Depends(get_db)):
     ev = get_event_or_404(db, slug)
-    if ev.status != "active":
+    if ev.status != "active" or not ev.photos:
         raise HTTPException(status_code=403, detail="This gallery isn't active yet.")
 
     if ev.freeup_warned_at or ev.files_freed_at:
@@ -593,6 +637,53 @@ def logout(slug: str, request: Request):
 @app.get("/api/e/{slug}/me")
 def me(slug: str, request: Request):
     return {"authenticated": slug in request.session.get("auth_events", [])}
+
+
+@app.get("/api/e/{slug}/account")
+def account(slug: str, request: Request, db: Session = Depends(get_db)):
+    """What this couple has, for the home page and the links between pages."""
+    require_event_auth(request, slug)
+    ev = get_event_or_404(db, slug)
+    return {"slug": ev.slug, "names": ev.couple_names, "active": ev.status == "active",
+            "photos": bool(ev.photos), "invite": bool(ev.invite), "home": _home_url(ev),
+            "prices": {"photos": 25, "invite": 20}}
+
+
+class AddonRequest(BaseModel):
+    product: str
+    access_code: str | None = None
+
+    @field_validator("product")
+    @classmethod
+    def check_product(cls, v: str) -> str:
+        if v not in ("photos", "invite"):
+            raise ValueError("Unknown add-on.")
+        return v
+
+
+@app.post("/api/e/{slug}/addon")
+def buy_addon(slug: str, body: AddonRequest, request: Request, db: Session = Depends(get_db)):
+    """Add the photo gallery or the invitation to an existing account:
+    free with a valid code (or in stub mode), otherwise Stripe checkout."""
+    require_event_auth(request, slug)
+    ev = get_event_or_404(db, slug)
+    if getattr(ev, body.product):
+        return {"ok": True, "next": _home_url(ev)}
+    code_ok, partner_code = _check_access_code(db, (body.access_code or "").strip())
+    if code_ok or not config.PAYMENTS_ENABLED:
+        setattr(ev, body.product, True)
+        if ev.status != "active":
+            _activate(ev)
+        if partner_code:
+            partner_code.uses += 1
+        db.commit()
+        return {"ok": True, "next": _home_url(ev)}
+    if not payments.link_for(body.product):
+        raise HTTPException(status_code=503, detail="This add-on opens very soon. Use an access code for now.")
+    prefix = payments.INVITE_REF_PREFIX if body.product == "invite" else payments.PHOTOS_REF_PREFIX
+    request.session["last_slug"] = ev.slug
+    request.session["pending_addon"] = body.product  # the success page waits for it
+    return {"ok": False, "payment_url": payments.payment_url(ev, body.product, prefix)}
 
 
 # ---------------------------------------------------------------------------
@@ -915,55 +1006,73 @@ def admin_page():
 # ---------------------------------------------------------------------------
 # WED-36: animated invitation + RSVP
 # ---------------------------------------------------------------------------
-# One invitation per couple, edited from their gallery account. Guests open
-# /i/<slug>: the envelope video plays, the names appear on the card, then the
-# details and the RSVP form slide up. The couple can preview it any time; the
-# guest link only works once it's published (paid, or unlocked with a code).
+# One invitation per couple. Guests open /i/<slug>: the envelope video plays,
+# the card writes itself (names, date, ceremony, reception, two extra lines of
+# the couple's choosing), then they RSVP. Any couple can design and preview
+# it; the guest link works once the account has the invitation add-on.
 
 INVITE_THEMES = {"envelope"}
+INVITE_FONTS = {"classic", "romantic", "calligraphy", "modern", "timeless"}
 MAX_RSVPS = 1000
 _DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 _TIME_RE = re.compile(r"^\d{2}:\d{2}$")
+_INVITE_FIELDS = ("names", "date", "time", "venue", "map_url", "reception", "reception_map",
+                  "extra1_label", "extra1_text", "extra2_label", "extra2_text",
+                  "message", "rsvp_by", "theme", "font")
 
 
 def _get_invitation(db: Session, ev: Event) -> Invitation | None:
     return db.get(Invitation, ev.id)
 
 
+def _invitation_live(ev: Event | None, inv: Invitation | None) -> bool:
+    return bool(ev and inv and ev.status == "active" and ev.invite)
+
+
 def _invitation_json(ev: Event, inv: Invitation | None) -> dict:
     """The invitation's fields; defaults (names from the account) when there's none yet."""
-    return {
-        "names": (inv.names if inv and inv.names else ev.couple_names) or "",
-        "date": inv.date if inv else "",
-        "time": inv.time if inv else "",
-        "venue": inv.venue if inv else "",
-        "address": inv.address if inv else "",
-        "map_url": inv.map_url if inv else "",
-        "message": inv.message if inv else "",
-        "rsvp_by": inv.rsvp_by if inv else "",
-        "theme": inv.theme if inv else "envelope",
-        "status": inv.status if inv else "draft",
-    }
+    data = {f: (getattr(inv, f) or "") if inv else "" for f in _INVITE_FIELDS}
+    data["names"] = data["names"] or ev.couple_names or ""
+    data["theme"] = data["theme"] or "envelope"
+    data["font"] = data["font"] or "classic"
+    return data
+
+
+def _clean(v: str, n: int) -> str:
+    return " ".join((v or "").split())[:n]
+
+
+def _url(v: str) -> str:
+    v = (v or "").strip()
+    if v and not v.startswith(("https://", "http://")):
+        raise ValueError("Map links should start with https://")
+    return v[:500]
 
 
 class InvitationRequest(BaseModel):
     names: str
     date: str = ""
     time: str = ""
-    venue: str = ""
-    address: str = ""
-    map_url: str = ""
+    venue: str = ""            # ceremony
+    map_url: str = ""          # ceremony map
+    reception: str = ""
+    reception_map: str = ""
+    extra1_label: str = ""
+    extra1_text: str = ""
+    extra2_label: str = ""
+    extra2_text: str = ""
     message: str = ""
     rsvp_by: str = ""
     theme: str = "envelope"
+    font: str = "classic"
 
     @field_validator("names")
     @classmethod
     def v_names(cls, v: str) -> str:
-        v = v.strip()
+        v = _clean(v, 120)
         if not v:
             raise ValueError("Add your names.")
-        return v[:120]
+        return v
 
     @field_validator("date", "rsvp_by")
     @classmethod
@@ -981,23 +1090,20 @@ class InvitationRequest(BaseModel):
             raise ValueError("Use a time like 18:30.")
         return v
 
-    @field_validator("map_url")
+    @field_validator("map_url", "reception_map")
     @classmethod
     def v_map(cls, v: str) -> str:
-        v = v.strip()
-        if v and not v.startswith(("https://", "http://")):
-            raise ValueError("The map link should start with https://")
-        return v[:500]
+        return _url(v)
 
-    @field_validator("venue")
+    @field_validator("venue", "reception", "extra1_text", "extra2_text")
     @classmethod
-    def v_venue(cls, v: str) -> str:
-        return v.strip()[:120]
+    def v_line(cls, v: str) -> str:
+        return _clean(v, 120)
 
-    @field_validator("address")
+    @field_validator("extra1_label", "extra2_label")
     @classmethod
-    def v_address(cls, v: str) -> str:
-        return v.strip()[:200]
+    def v_label(cls, v: str) -> str:
+        return _clean(v, 40)
 
     @field_validator("message")
     @classmethod
@@ -1008,6 +1114,11 @@ class InvitationRequest(BaseModel):
     @classmethod
     def v_theme(cls, v: str) -> str:
         return v if v in INVITE_THEMES else "envelope"
+
+    @field_validator("font")
+    @classmethod
+    def v_font(cls, v: str) -> str:
+        return v if v in INVITE_FONTS else "classic"
 
 
 @app.get("/e/{slug}/invite")
@@ -1024,7 +1135,7 @@ def invitation_guest_page(slug: str, db: Session = Depends(get_db)):
     from html import escape
     ev = db.query(Event).filter(Event.slug == slug).first()
     inv = _get_invitation(db, ev) if ev else None
-    if inv and inv.status == "active":
+    if _invitation_live(ev, inv):
         title = f"{inv.names or ev.couple_names} · You're invited"
         desc = "Tap to open your invitation and reply."
     else:
@@ -1040,9 +1151,13 @@ def invitation_guest_page(slug: str, db: Session = Depends(get_db)):
 def get_invitation(slug: str, request: Request, db: Session = Depends(get_db)):
     require_event_auth(request, slug)
     ev = get_event_or_404(db, slug)
-    data = _invitation_json(ev, _get_invitation(db, ev))
+    inv = _get_invitation(db, ev)
+    data = _invitation_json(ev, inv)
+    data["saved"] = inv is not None
+    data["live"] = _invitation_live(ev, inv)
+    data["has_invite"] = bool(ev.invite) and ev.status == "active"
+    data["has_photos"] = bool(ev.photos) and ev.status == "active"
     data["guest_url"] = f"{config.PUBLIC_BASE_URL}/i/{ev.slug}"
-    data["price_ready"] = bool(config.STRIPE_INVITE_LINK_URL) or not config.PAYMENTS_ENABLED
     return data
 
 
@@ -1058,50 +1173,34 @@ def save_invitation(slug: str, body: InvitationRequest, request: Request, db: Se
         setattr(inv, field, value)
     inv.updated_at = now_utc()
     db.commit()
-    return _invitation_json(ev, inv)
+    data = _invitation_json(ev, inv)
+    data["live"] = _invitation_live(ev, inv)
+    return data
 
 
-class PublishRequest(BaseModel):
-    access_code: str | None = None
-
-
-@app.post("/api/e/{slug}/invitation/publish")
-def publish_invitation(slug: str, body: PublishRequest, request: Request, db: Session = Depends(get_db)):
-    """Make the guest link live: free with a valid code (or in stub mode),
-    otherwise send the couple to the invitation's Stripe Payment Link."""
-    require_event_auth(request, slug)
+@app.get("/e/{slug}/invite-qr.png")
+def invitation_qr(slug: str, db: Session = Depends(get_db)):
+    """QR code for printed invitations or save-the-dates."""
     ev = get_event_or_404(db, slug)
-    inv = _get_invitation(db, ev)
-    if not inv:
-        raise HTTPException(status_code=400, detail="Save your invitation first.")
-    if inv.status == "active":
-        return {"status": "active"}
-    code_ok, partner_code = _check_access_code(db, (body.access_code or "").strip())
-    if code_ok or not config.PAYMENTS_ENABLED:
-        inv.status = "active"
-        inv.paid_at = now_utc()
-        if code_ok:
-            inv.access_code = partner_code.code if partner_code else "FREE_ACCESS_CODE"
-            if partner_code:
-                partner_code.uses += 1
-        db.commit()
-        return {"status": "active"}
-    if not config.STRIPE_INVITE_LINK_URL:
-        raise HTTPException(status_code=503, detail="Invitation payments open soon. Use an access code for now.")
-    return {"status": "draft", "payment_url": payments.invite_payment_url(ev)}
+    import qrcode
+    img = qrcode.make(f"{config.PUBLIC_BASE_URL}/i/{ev.slug}", box_size=10, border=2)
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    return Response(buf.getvalue(), media_type="image/png")
 
 
 @app.get("/api/i/{slug}")
 def public_invitation(slug: str, request: Request, db: Session = Depends(get_db)):
-    """What a guest sees. The couple can see it before it's published (preview)."""
+    """What a guest sees. The couple can always see theirs (preview)."""
     ev = db.query(Event).filter(Event.slug == slug).first()
     inv = _get_invitation(db, ev) if ev else None
+    live = _invitation_live(ev, inv)
     is_couple = bool(ev) and slug in request.session.get("auth_events", [])
-    if not inv or (inv.status != "active" and not is_couple):
+    if not inv or not (live or is_couple):
         raise HTTPException(status_code=404, detail="Invitation not found")
     data = _invitation_json(ev, inv)
-    data["preview"] = inv.status != "active"
-    data["upload_url"] = f"/e/{ev.slug}" if ev.status == "active" else None
+    data["preview"] = not live
+    data["upload_url"] = f"/e/{ev.slug}" if ev.status == "active" and ev.photos else None
     return data
 
 
@@ -1136,7 +1235,7 @@ class RsvpRequest(BaseModel):
 def submit_rsvp(slug: str, body: RsvpRequest, db: Session = Depends(get_db)):
     ev = db.query(Event).filter(Event.slug == slug).first()
     inv = _get_invitation(db, ev) if ev else None
-    if not inv or inv.status != "active":
+    if not _invitation_live(ev, inv):
         raise HTTPException(status_code=404, detail="Invitation not found")
     # Same name again = a changed answer, not a second guest.
     existing = (db.query(Rsvp).filter(Rsvp.event_id == ev.id, func.lower(Rsvp.name) == body.name.lower())

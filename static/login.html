@@ -16,7 +16,7 @@
 
 <header class="topbar">
   <a href="/" class="brand"><img src="/static/favicon.svg" alt="" /><span>Confetti</span></a>
-  <nav class="nav"><a href="/create" class="nav-link">Create a gallery</a></nav>
+  <nav class="nav"><a href="/create" class="nav-link">Get started</a></nav>
 </header>
 
 <main class="narrow" style="margin-top:3rem">
@@ -30,9 +30,9 @@
         <input class="input" type="email" id="email" placeholder="you@example.com" autocomplete="email" inputmode="email" />
       </div>
       <div class="field">
-        <label class="label" for="password">Gallery password</label>
+        <label class="label" for="password">Password</label>
         <div class="pw-wrap">
-          <input class="input" type="password" id="password" placeholder="Your gallery password" autocomplete="current-password" />
+          <input class="input" type="password" id="password" placeholder="Your password" autocomplete="current-password" />
           <button type="button" class="pw-toggle" id="pwToggle">Show</button>
         </div>
       </div>
@@ -41,7 +41,7 @@
       <div class="alert alert-error" id="error" role="alert"></div>
     </form>
   </div>
-  <p class="foot-note">No gallery yet? <a href="/create">Create one for €25</a></p>
+  <p class="foot-note">No account yet? <a href="/create">Get started</a></p>
 </main>
 
 <script>
@@ -77,8 +77,8 @@
         body: JSON.stringify({ email, password }),
       });
       if (res.ok) {
-        const { slug } = await res.json();
-        window.location.href = `/e/${slug}/gallery`;
+        const data = await res.json();
+        window.location.href = data.next || `/e/${data.slug}/gallery`;
         return;
       }
       showError(res.status === 401 ? "Wrong email or password." : `Error ${res.status}. Try again.`);
