@@ -27,11 +27,12 @@
     .seg { display: inline-flex; background: var(--bg-deep); border-radius: 999px; padding: 4px; margin-bottom: 1rem; }
     .seg button { border: 0; background: none; font: inherit; font-weight: 600; font-size: .9rem; padding: .5rem 1.2rem; border-radius: 999px; color: var(--ink-soft); cursor: pointer; }
     .seg button[aria-pressed="true"] { background: #fff; color: var(--ink); box-shadow: 0 1px 4px rgba(0,0,0,.08); }
-    .looks { display: grid; grid-template-columns: repeat(3, 1fr); gap: .6rem; }
+    .looks { display: grid; grid-template-columns: repeat(5, 1fr); gap: .5rem; }
+    @media (max-width: 560px) { .looks { grid-template-columns: repeat(3, 1fr); } }
     .look { border: 1.5px solid var(--line); border-radius: 14px; background: #FFFDFB; padding: .45rem .45rem .55rem; cursor: pointer; text-align: center; font: inherit; color: var(--ink); }
     .look[aria-checked="true"] { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(158,79,69,.12); }
     .look:disabled { cursor: default; opacity: .55; }
-    .look .thumb { aspect-ratio: 9/14; border-radius: 9px; background-size: cover; background-position: center; display: grid; place-items: center; overflow: hidden; }
+    .look .thumb { aspect-ratio: 9/16; border-radius: 9px; background-size: cover; background-position: center; }
     .look .thumb em { font-style: normal; font-size: 1.35rem; line-height: 1.2; padding: 0 .3rem; }
     .look b { display: block; font-size: .82rem; margin-top: .45rem; }
     .look small { display: block; font-size: .72rem; color: var(--muted); }
@@ -96,12 +97,9 @@
   <div class="grid">
     <form id="form" novalidate>
       <section class="card" aria-labelledby="styleH">
-        <h2 id="styleH">Style</h2>
-        <div class="seg" role="group" aria-label="Kind">
-          <button type="button" data-kind="film" aria-pressed="true">Film</button>
-          <button type="button" data-kind="site" aria-pressed="false">Website</button>
-        </div>
+        <h2 id="styleH">Design</h2>
         <div class="looks" id="looks" role="radiogroup" aria-label="Design"></div>
+        <p class="hint" style="margin-top:.8rem"><span id="lookNote"></span> <a id="demoLink" target="_blank" rel="noopener">See it full screen ↗</a></p>
       </section>
 
       <section class="card" aria-labelledby="fontsH">
@@ -118,32 +116,7 @@
         </div>
       </section>
 
-      <section class="card" id="filmCard" aria-labelledby="filmH">
-        <h2 id="filmH">On the card</h2>
-        <div class="group" style="border:0;padding-top:0;margin-top:0">
-          <h3>Ceremony</h3>
-          <div class="field"><label class="label" for="venue">Where</label><input class="input" id="venue" maxlength="120" placeholder="Agios Georgios Church, Paphos" /></div>
-          <div class="field"><label class="label" for="map_url">Map link <span class="opt">(optional)</span></label><input class="input" id="map_url" maxlength="500" placeholder="https://maps.app.goo.gl/..." /></div>
-        </div>
-        <div class="group">
-          <h3>Reception</h3>
-          <div class="field"><label class="label" for="reception">Where</label><input class="input" id="reception" maxlength="120" placeholder="Elysium Hotel, Paphos" /></div>
-          <div class="field"><label class="label" for="reception_map">Map link <span class="opt">(optional)</span></label><input class="input" id="reception_map" maxlength="500" placeholder="https://maps.app.goo.gl/..." /></div>
-        </div>
-        <div class="group">
-          <h3>Your own lines</h3>
-          <div class="field-row">
-            <div class="field"><label class="label" for="extra1_label">Title</label><input class="input" id="extra1_label" maxlength="40" placeholder="Dress code" /></div>
-            <div class="field"><label class="label" for="extra1_text">Text</label><input class="input" id="extra1_text" maxlength="120" placeholder="Black tie" /></div>
-          </div>
-          <div class="field-row">
-            <div class="field"><label class="label" for="extra2_label">Title</label><input class="input" id="extra2_label" maxlength="40" placeholder="After party" /></div>
-            <div class="field"><label class="label" for="extra2_text">Text</label><input class="input" id="extra2_text" maxlength="120" placeholder="Beach bar, 23:00" /></div>
-          </div>
-        </div>
-      </section>
-
-      <section class="card" id="siteCard" aria-labelledby="secH" hidden>
+      <section class="card" id="siteCard" aria-labelledby="secH">
         <h2 id="secH">Sections</h2>
         <div id="secList"></div>
         <p class="empty" id="secEmpty">Add what your guests should know.</p>
@@ -157,8 +130,8 @@
       </section>
 
       <section class="card" aria-labelledby="msgH">
-        <h2 id="msgH">Message and replies</h2>
-        <div class="field"><label class="label" for="message">Message <span class="opt">(optional)</span></label><textarea class="input" id="message" maxlength="600" placeholder="We can't wait to celebrate with you."></textarea></div>
+        <h2 id="msgH">Welcome and replies</h2>
+        <div class="field"><label class="label" for="message">Welcome message <span class="opt">(optional)</span></label><textarea class="input" id="message" maxlength="600" placeholder="We can't wait to celebrate with you."></textarea></div>
         <div class="field"><label class="label" for="rsvp_by">Reply by <span class="opt">(optional)</span></label><input class="input" id="rsvp_by" type="date" /></div>
       </section>
 
@@ -172,8 +145,8 @@
 
     <div class="side">
       <section class="card" aria-label="Preview and sharing">
-        <div class="phone" id="phone"><div class="host" id="pvHost"></div></div>
-        <p class="center" style="margin:-.25rem 0 1.25rem"><button class="btn btn-soft btn-sm" type="button" id="playBtn">▶ Play</button></p>
+        <div class="phone" id="phone"></div>
+        <p class="center" style="margin:-.25rem 0 1.25rem"><button class="btn btn-soft btn-sm" type="button" id="playBtn">▶ Play from the start</button></p>
 
         <div id="shareBox" hidden>
           <h2>Send to guests</h2>
@@ -212,16 +185,16 @@
 <script src="/static/dialog.js"></script>
 <script src="/static/account.js"></script>
 <script src="/static/invite/card.js"></script>
-<script src="/static/invite/films.js"></script>
+<script src="/static/invite/designs.js"></script>
 <script>
 "use strict";
 (async function () {
   const $ = (id) => document.getElementById(id);
   const slug = location.pathname.split("/")[2];
   const API = `/api/e/${encodeURIComponent(slug)}`;
-  const FIELDS = ["names", "date", "time", "venue", "map_url", "reception", "reception_map",
-                  "extra1_label", "extra1_text", "extra2_label", "extra2_text", "message", "rsvp_by"];
-  const SITES = { linen: "Linen", garden: "Garden", noir: "Noir" };
+  const FIELDS = ["names", "date", "time", "message", "rsvp_by"];
+  const DESIGNS = ConfettiDesigns.DESIGNS;
+  const fontCss = document.createElement("link"); fontCss.rel = "stylesheet"; fontCss.href = ConfettiCard.FONT_CSS; document.head.appendChild(fontCss);
   const SECTION_INFO = {
     text: { label: "Text", fields: [["title", "Title", "Our story", 80], ["body", "Text", "", 1500, true]] },
     event: { label: "Schedule", fields: [["title", "What", "Ceremony", 80], ["time", "Time", "", 5, false, "time"], ["place", "Where", "Agios Georgios Church", 120], ["map_url", "Map link", "https://maps.app.goo.gl/...", 500]] },
@@ -235,8 +208,18 @@
   const res = await fetch(`${API}/invitation`);
   if (res.status === 401) { location.href = "/login"; return; }
   const inv = await res.json();
-  const state = { kind: inv.kind || "film", theme: inv.theme, font: inv.font || "classic", sections: inv.sections || [] };
+  const state = { theme: DESIGNS[inv.theme] ? inv.theme : "linen", font: inv.font || "classic", sections: inv.sections || [] };
   FIELDS.forEach((f) => { $(f).value = inv[f] || ""; });
+  // A new invitation starts from the design's own content: ready to read, easy to change or delete.
+  const strip = (secs) => JSON.stringify(secs.map(({ id, url, ...s }) => s));
+  let starterSnap = null;
+  function applyStarter(theme) {
+    state.sections = ConfettiDesigns.starter(theme);
+    starterSnap = strip(state.sections);
+    if (!$("message").value || Object.values(DESIGNS).some((d) => d.message === $("message").value)) $("message").value = DESIGNS[theme].message;
+    if (!inv.saved) state.font = DESIGNS[theme].font;
+  }
+  if (!inv.saved || !state.sections.length) applyStarter(state.theme);
 
   if (inv.has_photos) {
     $("backLink").hidden = false;
@@ -246,7 +229,7 @@
   $("logout").onclick = async (e) => { e.preventDefault(); await fetch(`${API}/logout`, { method: "POST" }); location.href = "/login"; };
 
   function values() {
-    const o = { kind: state.kind, theme: state.theme, font: state.font, sections: state.sections.map(({ url, ...s }) => s) };
+    const o = { kind: "site", theme: state.theme, font: state.font, sections: state.sections.map(({ url, ...s }) => s) };
     FIELDS.forEach((f) => { o[f] = $(f).value; });
     return o;
   }
@@ -254,38 +237,31 @@
   function previewData() { const v = values(); v.sections = state.sections; v.upload_url = null; return v; }
   let saved = inv.saved ? JSON.stringify(values()) : null;
   const isDirty = () => JSON.stringify(values()) !== saved;
-  function changed() { $("saveMsg").textContent = isDirty() ? "" : "Saved"; schedulePreview(); }
+  function changed(replay) { $("saveMsg").textContent = isDirty() ? "" : "Saved"; schedulePreview(replay === true); }
 
-  // ── Style: film or website, and which design ────────────────────
+  // ── Design ──────────────────────────────────────────────────────
   function renderLooks() {
-    document.querySelectorAll(".seg button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.kind === state.kind)));
     const box = $("looks"); box.innerHTML = "";
-    const font = ConfettiCard.FONTS[state.font] || ConfettiCard.FONTS.classic;
-    const names = $("names").value.trim() || "Sofia & Daniel";
-    const items = state.kind === "film"
-      ? Object.entries(ConfettiFilms).map(([id, f]) => ({ id, label: f.label, ready: f.ready, cls: f.ready ? "" : "t-soon", bg: f.ready ? `url('/static/invite/${f.files}-start.jpg')` : "" }))
-      : Object.entries(SITES).map(([id, label]) => ({ id, label, ready: true, cls: "t-" + id }));
-    for (const it of items) {
+    for (const [id, d] of Object.entries(DESIGNS)) {
       const b = document.createElement("button");
       b.type = "button"; b.className = "look"; b.setAttribute("role", "radio");
-      b.setAttribute("aria-checked", String(it.id === state.theme)); b.disabled = !it.ready;
-      b.innerHTML = `<div class="thumb ${it.cls}"></div><b></b><small></small>`;
-      if (it.bg) b.querySelector(".thumb").style.backgroundImage = it.bg;
-      if (state.kind === "site") { const em = document.createElement("em"); em.textContent = names.split("&")[0].trim(); em.style.fontFamily = font.names; b.querySelector(".thumb").append(em); }
-      b.querySelector("b").textContent = it.label;
-      b.querySelector("small").textContent = it.ready ? "" : "Soon";
-      b.onclick = () => { state.theme = it.id; renderLooks(); changed(); };
+      b.setAttribute("aria-checked", String(id === state.theme));
+      b.innerHTML = `<div class="thumb"></div><b></b>`;
+      b.querySelector(".thumb").style.backgroundImage = `url('/static/invite/thumb-${id}.jpg')`;
+      b.querySelector("b").textContent = d.label;
+      b.onclick = () => {
+        if (state.theme === id) return;
+        // Untouched starter content follows the design; edited content stays.
+        const untouched = !state.sections.length || strip(state.sections) === starterSnap;
+        state.theme = id;
+        if (untouched) { applyStarter(id); renderSections(); renderFonts(); }
+        renderLooks(); changed(true);
+      };
       box.append(b);
     }
-    $("filmCard").hidden = state.kind !== "film";
-    $("siteCard").hidden = state.kind !== "site";
+    $("lookNote").textContent = DESIGNS[state.theme].note;
+    $("demoLink").href = `/demo/${state.theme}`;
   }
-  document.querySelectorAll(".seg button").forEach((b) => b.onclick = () => {
-    if (state.kind === b.dataset.kind) return;
-    state.kind = b.dataset.kind;
-    state.theme = state.kind === "site" ? "linen" : "envelope";
-    renderLooks(); setupPreview(); changed();
-  });
 
   // ── Fonts ───────────────────────────────────────────────────────
   Object.entries(ConfettiCard.FONTS).forEach(([key, f]) => {
@@ -295,7 +271,7 @@
     b.querySelector(".n").style.fontFamily = f.names;
     if (f.italic) b.querySelector(".n").style.fontStyle = "italic";
     b.querySelector("small").textContent = f.label;
-    b.onclick = () => { state.font = key; renderFonts(); renderLooks(); changed(); };
+    b.onclick = () => { state.font = key; renderFonts(); changed(); };
     $("fonts").appendChild(b);
   });
   function renderFonts() {
@@ -316,6 +292,8 @@
         <button type="button" class="icon-btn" data-act="down" aria-label="Move down" ${i < state.sections.length - 1 ? "" : "disabled"}>↓</button>
         <button type="button" class="icon-btn" data-act="del" aria-label="Remove">✕</button></div>`;
       item.querySelector("b").textContent = info.label;
+      const empty = { text: !s.body, event: !s.title, photo: !s.key, qa: !(s.question && s.answer), countdown: false }[s.type];
+      if (empty) { const h = document.createElement("span"); h.className = "hint"; h.style.margin = "0 .4rem 0 0"; h.textContent = "Hidden until filled in"; item.querySelector(".sec-head b").after(h); }
       if (s.type === "photo") {
         const pick = document.createElement("div"); pick.className = "field photo-pick";
         pick.innerHTML = `<img alt="" /><label class="btn btn-ghost btn-sm">Choose photo<input type="file" accept="image/*" hidden /></label><span class="hint"></span>`;
@@ -333,6 +311,7 @@
         if (type) input.type = type;
         input.value = s[field] || "";
         input.oninput = () => { s[field] = input.value; changed(); };
+        input.onchange = () => renderSections();
         f.append(input); item.append(f);
       }
       item.querySelectorAll("[data-act]").forEach((b) => b.onclick = () => {
@@ -377,42 +356,26 @@
     } catch { return file; }
   }
 
-  // ── Preview: the film card, or the website itself in a phone ────
-  let pv = null, frame = null, frameReady = false, previewTimer = null;
+  // ── Preview: the website itself, in a phone ─────────────────────
+  let frame = null, frameReady = false, previewTimer = null, replayNext = true;
   function setupPreview() {
-    const phone = $("phone"), host = $("pvHost");
-    if (frame) { frame.remove(); frame = null; frameReady = false; }
-    host.innerHTML = "";
-    if (state.kind === "site") {
-      phone.style.backgroundImage = "none"; phone.style.background = "#fff";
-      frame = document.createElement("iframe"); frame.title = "Website preview"; frame.src = "/static/site.html?embed=1";
-      phone.append(frame); scaleFrame();
-      $("playBtn").textContent = "▶ Replay";
-    } else {
-      const film = ConfettiFilm(state.theme);
-      phone.style.background = `${film.background} url('${film.end}') center/cover`;
-      Object.assign(host.style, { left: film.card.left * 100 + "%", width: film.card.width * 100 + "%", top: film.card.top * 100 + "%", height: film.card.height * 100 + "%" });
-      $("playBtn").textContent = "▶ Watch it write";
-      renderCard(true);
-    }
+    frame = document.createElement("iframe"); frame.title = "Website preview"; frame.src = "/static/site.html?embed=1";
+    $("phone").append(frame); scaleFrame();
   }
   function scaleFrame() { if (frame) frame.style.transform = `scale(${$("phone").clientWidth / 390})`; }
-  addEventListener("resize", () => { scaleFrame(); if (pv) pv.fit(); });
+  addEventListener("resize", scaleFrame);
   addEventListener("message", (e) => {
     if (e.origin === location.origin && e.data && e.data.type === "confetti-preview-ready") { frameReady = true; sendPreview(); }
   });
-  function sendPreview() { if (frame && frameReady) frame.contentWindow.postMessage({ type: "confetti-preview", inv: previewData() }, location.origin); }
-  function renderCard(animate) {
-    pv = ConfettiCard.render($("pvHost"), previewData(), { animate });
-    if (animate) requestAnimationFrame(() => pv.play());
+  function sendPreview() {
+    if (!frame || !frameReady) return;
+    frame.contentWindow.postMessage({ type: "confetti-preview", inv: previewData(), replay: replayNext }, location.origin);
+    replayNext = false;
   }
-  function schedulePreview() {
-    clearTimeout(previewTimer);
-    previewTimer = setTimeout(() => { if (state.kind === "site") sendPreview(); else renderCard(false); }, 120);
-  }
-  $("playBtn").onclick = () => { if (state.kind === "site") setupPreview(); else renderCard(true); };
+  function schedulePreview(replay) { if (replay) replayNext = true; clearTimeout(previewTimer); previewTimer = setTimeout(sendPreview, 120); }
+  $("playBtn").onclick = () => schedulePreview(true);
 
-  FIELDS.forEach((f) => $(f).addEventListener("input", () => { if (f === "names") { renderFonts(); renderLooks(); } changed(); }));
+  FIELDS.forEach((f) => $(f).addEventListener("input", () => { if (f === "names") renderFonts(); changed(); }));
 
   // ── Save, preview, share ────────────────────────────────────────
   async function save() {
@@ -470,7 +433,7 @@
   }
 
   renderFonts(); renderLooks(); renderSections(); renderShare(); changed();
-  (document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve()).then(() => setTimeout(setupPreview, 200));
+  setupPreview();
   loadRsvps(); setInterval(() => { if (!document.hidden) loadRsvps(); }, 30000);
 })();
 </script>

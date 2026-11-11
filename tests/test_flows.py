@@ -621,7 +621,8 @@ def test_guest_page_link_preview_shows_names_only_when_live(client, signup):
 
 
 def test_new_pages_load(client):
-    for path in ["/e/abc/invite", "/i/abc", "/e/abc/home", "/static/invite/envelope.mp4", "/static/invite/card.js"]:
+    for path in ["/e/abc/invite", "/i/abc", "/e/abc/home", "/static/invite/designs.js", "/static/invite/card.js",
+                 "/demo/riviera", "/static/invite/og-noir.jpg", "/static/invite/thumb-bloom.jpg"]:
         assert client.get(path).status_code == 200, path
     assert client.get("/e/nope/invite-qr.png").status_code == 404
 
@@ -649,7 +650,7 @@ def test_website_invitation_sections_are_cleaned_and_rendered(client, signup):
     assert saved["kind"] == "site" and saved["theme"] == "noir"
 
     page = client.get(f"/i/{slug}").text
-    assert "Confetti website invitation" in page and "__OG_" not in page
+    assert "Confetti website invitation" in page and "__OG_" not in page and "/static/invite/og-noir.jpg" in page
     pub = client.get(f"/api/i/{slug}").json()
     assert pub["sections"][0]["title"] == "Our story"
 
@@ -660,9 +661,11 @@ def test_website_invitation_validation(client, signup):
     assert client.put(f"/api/e/{slug}/invitation", json=bad_map).status_code == 422
     bad_time = {**_INVITE, "kind": "site", "sections": [{"type": "event", "time": "5pm"}]}
     assert client.put(f"/api/e/{slug}/invitation", json=bad_time).status_code == 422
-    # A film theme with kind=site falls back to the first website design, and the other way round.
-    assert client.put(f"/api/e/{slug}/invitation", json={**_INVITE, "kind": "site", "theme": "envelope"}).json()["theme"] == "linen"
-    assert client.put(f"/api/e/{slug}/invitation", json={**_INVITE, "kind": "film", "theme": "noir"}).json()["theme"] == "envelope"
+    # Old film themes and unknown designs fall back to Linen; every invitation is a website now.
+    for theme in ("envelope", "nope"):
+        got = client.put(f"/api/e/{slug}/invitation", json={**_INVITE, "kind": "film", "theme": theme}).json()
+        assert got["theme"] == "linen" and got["kind"] == "site"
+    assert client.put(f"/api/e/{slug}/invitation", json={**_INVITE, "theme": "riviera"}).json()["theme"] == "riviera"
     many = {**_INVITE, "kind": "site", "sections": [{"type": "text", "title": str(i)} for i in range(50)]}
     assert len(client.put(f"/api/e/{slug}/invitation", json=many).json()["sections"]) == 30
     assert client.post(f"/api/e/{slug}/invitation/photo-url", json={"content_type": "image/gif", "file_size": 10}).status_code == 400

@@ -29,7 +29,7 @@ from pathlib import Path
 from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Request, Response
 from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, field_validator, model_validator
+from pydantic import BaseModel, field_validator
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 from starlette.middleware.sessions import SessionMiddleware
@@ -1050,16 +1050,14 @@ def admin_page():
 # ---------------------------------------------------------------------------
 # WED-36: animated invitation + RSVP
 # ---------------------------------------------------------------------------
-# One invitation per couple. Guests open /i/<slug>: the envelope video plays,
-# the card writes itself (names, date, ceremony, reception, two extra lines of
-# the couple's choosing), then they RSVP. Any couple can design and preview
-# it; the guest link works once the account has the invitation add-on.
+# One invitation per couple: a scrolling wedding website in one of five
+# designs, made of the couple's own sections, ending in the RSVP. Guests open
+# /i/<slug>. Any couple can design and preview it; the guest link works once
+# the account has the invitation add-on.
 
-# Films: the opening videos (static/invite/films.js has their files and card position).
-# Sites: the scrolling website designs (static/invite/site.html).
-FILM_THEMES = {"envelope", "film2", "film3"}
-SITE_THEMES = {"linen", "garden", "noir"}
-INVITE_THEMES = FILM_THEMES | SITE_THEMES
+# The website designs (static/site.html renders them, static/invite/designs.js
+# holds their starter sections). The earlier film invitations were retired.
+SITE_THEMES = {"linen", "garden", "noir", "riviera", "bloom"}
 MAX_SECTIONS = 30
 MAX_INVITE_PHOTO = 15 * 1024 * 1024
 INVITE_PHOTO_TYPES = {"image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp"}
@@ -1125,8 +1123,8 @@ def _invitation_json(ev: Event, inv: Invitation | None) -> dict:
     """The invitation's fields; defaults (names from the account) when there's none yet."""
     data = {f: (getattr(inv, f) or "") if inv else "" for f in _INVITE_FIELDS}
     data["names"] = data["names"] or ev.couple_names or ""
-    data["kind"] = data["kind"] if data["kind"] in ("film", "site") else "film"
-    data["theme"] = data["theme"] or ("linen" if data["kind"] == "site" else "envelope")
+    data["kind"] = "site"
+    data["theme"] = data["theme"] if data["theme"] in SITE_THEMES else "linen"
     data["font"] = data["font"] or "classic"
     data["sections"] = _load_sections(inv)
     return data
@@ -1165,9 +1163,9 @@ class InvitationRequest(BaseModel):
     extra2_text: str = ""
     message: str = ""
     rsvp_by: str = ""
-    theme: str = "envelope"
+    theme: str = "linen"
     font: str = "classic"
-    kind: str = "film"
+    kind: str = "site"
     sections: list = []
 
     @field_validator("names")
@@ -1217,14 +1215,12 @@ class InvitationRequest(BaseModel):
     @field_validator("kind")
     @classmethod
     def v_kind(cls, v: str) -> str:
-        return v if v in ("film", "site") else "film"
+        return "site"
 
-    @model_validator(mode="after")
-    def v_theme_matches_kind(self):
-        allowed = SITE_THEMES if self.kind == "site" else FILM_THEMES
-        if self.theme not in allowed:
-            self.theme = "linen" if self.kind == "site" else "envelope"
-        return self
+    @field_validator("theme")
+    @classmethod
+    def v_theme(cls, v: str) -> str:
+        return v if v in SITE_THEMES else "linen"
 
     @field_validator("font")
     @classmethod
@@ -1237,27 +1233,34 @@ def invitation_editor_page(slug: str):
     return FileResponse("static/invite-edit.html")
 
 
-_INVITE_HTML = Path("static/invite.html")
 _SITE_HTML = Path("static/site.html")
+
+
+def _site_page(title: str, desc: str, theme: str) -> Response:
+    from html import escape
+    image = f"{config.PUBLIC_BASE_URL}/static/invite/og-{theme if theme in SITE_THEMES else 'linen'}.jpg"
+    page = (_SITE_HTML.read_text(encoding="utf-8")
+            .replace("__OG_TITLE__", escape(title))
+            .replace("__OG_DESC__", escape(desc))
+            .replace("__OG_IMAGE__", escape(image)))
+    return Response(page, media_type="text/html")
+
+
+@app.get("/demo/{design}")
+def design_demo(design: str):
+    """A sample couple in any design: for the landing page and for couples choosing."""
+    return _site_page("Confetti · Wedding website invitation", "A sample invitation made with Confetti.", design)
 
 
 @app.get("/i/{slug}")
 def invitation_guest_page(slug: str, db: Session = Depends(get_db)):
     """The guest page, with the couple's names in the link preview (WhatsApp, iMessage)."""
-    from html import escape
     ev = db.query(Event).filter(Event.slug == slug).first()
     inv = _get_invitation(db, ev) if ev else None
     if _invitation_live(ev, inv):
-        title = f"{inv.names or ev.couple_names} · You're invited"
-        desc = "Tap to open your invitation and reply."
-    else:
-        title, desc = "You're invited", "A wedding invitation made with Confetti."
-    template = _SITE_HTML if inv and inv.kind == "site" else _INVITE_HTML
-    page = (template.read_text(encoding="utf-8")
-            .replace("__OG_TITLE__", escape(title))
-            .replace("__OG_DESC__", escape(desc))
-            .replace("__OG_IMAGE__", escape(f"{config.PUBLIC_BASE_URL}/static/invite/envelope-start.jpg")))
-    return Response(page, media_type="text/html")
+        return _site_page(f"{inv.names or ev.couple_names} · You're invited",
+                          "Tap to open your invitation and reply.", inv.theme)
+    return _site_page("You're invited", "A wedding invitation made with Confetti.", inv.theme if inv else "linen")
 
 
 @app.get("/api/e/{slug}/invitation")

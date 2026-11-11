@@ -2,7 +2,7 @@
 (function () {
   "use strict";
   const INFO = {
-    invite: { name: "Invitation + RSVP", price: "€20", body: "An animated envelope invitation for your guests, with replies collected for you." },
+    invite: { name: "Invitation + RSVP", price: "€20", body: "A wedding website invitation in one of five designs, with replies collected for you." },
     photos: { name: "Photo gallery", price: "€25", body: "A QR code for your tables. Guests' photos land in one private gallery, kept for 12 months." },
   };
   async function buy(slug, product) {
