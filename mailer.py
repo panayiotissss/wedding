@@ -59,7 +59,7 @@ def _layout(inner: str) -> str:
 </tr></table>
 {inner}
 </td></tr></table>
-<p style="color:#8C8077;font-size:12px;margin-top:16px">Confetti · Made with ❤ for the people getting married</p>
+<p style="color:#8C8077;font-size:12px;margin-top:16px">Confetti · Made with ❤ for people getting married</p>
 </td></tr></table></body></html>"""
 
 
@@ -93,3 +93,16 @@ If that was you, choose a new one below. The link works for 1 hour.</p>
     text = (f"Reset your Confetti password: {reset_url}\n\nThe link works for 1 hour. "
             "If you didn't ask for this, ignore this email.")
     return send(to, "Reset your Confetti password", html, text)
+
+
+def freeup_warning(to: str, names: str, gallery_url: str, clear_date: str) -> bool:
+    html = _layout(f"""
+<h1 style="font-family:Georgia,serif;font-size:26px;margin:0 0 8px">Keep your photos?</h1>
+<p style="color:#5C514A;line-height:1.55">{escape(names)}, you downloaded every photo from your gallery a while ago
+and no new ones have arrived since. To save space, we'll clear the photos from your gallery on
+<b>{escape(clear_date)}</b>. Your downloaded copy isn't affected.</p>
+<p style="color:#5C514A;line-height:1.55">Want to keep them online? Open your gallery and press <b>Keep my photos</b>.</p>
+<p style="margin:24px 0">{_button(gallery_url, "Open my gallery")}</p>""")
+    text = (f"{names}, you downloaded every photo from your gallery and no new ones have arrived since. "
+            f"We'll clear the photos on {clear_date}. To keep them online, open {gallery_url} and press Keep my photos.")
+    return send(to, "Your Confetti photos will be cleared soon", html, text)

@@ -8,7 +8,7 @@ R2 under a per-event prefix (see storage.py), so the DB only holds metadata.
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import DateTime, String, create_engine, text
+from sqlalchemy import Boolean, DateTime, Integer, String, create_engine, text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
 
 import config
@@ -41,6 +41,12 @@ class Event(Base):
     storage_prefix: Mapped[str | None] = mapped_column(String(120), nullable=True)
 
     # pending_payment → active
+    # Partner access code used to unlock this gallery for free (WED-24), if any.
+    access_code: Mapped[str | None] = mapped_column(String(40), nullable=True)
+
+    # Slug of the gallery whose guest page brought this couple (WED-23), if any.
+    referred_by: Mapped[str | None] = mapped_column(String(16), nullable=True)
+
     status: Mapped[str] = mapped_column(String(20), default="pending_payment")
     stripe_ref: Mapped[str | None] = mapped_column(String(120), nullable=True)
 
@@ -50,6 +56,25 @@ class Event(Base):
     paid_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     # WED-6: set to paid_at + EVENT_TTL_DAYS; cleanup deletes everything past this.
     expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    # WED-34: storage housekeeping
+    last_download_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    all_deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    freeup_warned_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    files_freed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class AccessCode(Base):
+    """A free-gallery code given to a partner (planner, venue, photographer).
+    Each gallery records the code it used, so we can see who brings couples."""
+    __tablename__ = "access_codes"
+
+    code: Mapped[str] = mapped_column(String(40), primary_key=True)   # stored upper-case
+    partner: Mapped[str] = mapped_column(String(120))
+    max_uses: Mapped[int | None] = mapped_column(Integer, nullable=True)   # None = unlimited
+    uses: Mapped[int] = mapped_column(Integer, default=0)
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
 
 
 class PasswordReset(Base):
@@ -85,6 +110,19 @@ engine = create_engine(_url, pool_pre_ping=True, connect_args=_connect_args)
 SessionLocal = sessionmaker(bind=engine, expire_on_commit=False)
 
 
+# Columns added after the table first existed. create_all() never adds
+# columns to an existing table, so Postgres gets them here (idempotent).
+ADDED_COLUMNS = [
+    "storage_prefix VARCHAR(120)",
+    "referred_by VARCHAR(16)",
+    "last_download_at TIMESTAMPTZ",
+    "all_deleted_at TIMESTAMPTZ",
+    "freeup_warned_at TIMESTAMPTZ",
+    "files_freed_at TIMESTAMPTZ",
+    "access_code VARCHAR(40)",
+]
+
+
 def init_db() -> None:
     """Create tables if they don't exist (fine for a POC — swap to Alembic later)."""
     Base.metadata.create_all(engine)
@@ -92,9 +130,8 @@ def init_db() -> None:
     # (create_all() only creates missing tables, never missing columns.)
     if _url.startswith("postgresql"):
         with engine.begin() as conn:
-            conn.execute(
-                text("ALTER TABLE events ADD COLUMN IF NOT EXISTS storage_prefix VARCHAR(120)")
-            )
+            for col in ADDED_COLUMNS:
+                conn.execute(text(f"ALTER TABLE events ADD COLUMN IF NOT EXISTS {col}"))
 
 
 def get_db():

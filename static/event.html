@@ -62,6 +62,12 @@
     .privacy { text-align: center; font-size: .8rem; color: var(--muted); margin-top: 1rem; }
     .couple-link { text-align: center; margin-top: 2rem; font-size: .82rem; color: var(--muted); }
     .couple-link a { color: var(--muted); }
+    .promo { display: grid; gap: .25rem; margin-top: 1.5rem; padding: 1rem 1.1rem; border-radius: 16px; text-decoration: none;
+      background: var(--surface); border: 1px dashed #DCCFC3; color: var(--ink); text-align: left; }
+    .promo b { font-family: var(--serif); font-size: 1.25rem; font-weight: 600; }
+    .promo span { font-size: .88rem; color: var(--ink-soft); }
+    .promo em { font-style: normal; font-weight: 600; color: var(--accent); font-size: .9rem; }
+    .promo:hover { border-color: var(--accent); }
     .made-with { text-align: center; margin-top: .6rem; font-size: .78rem; color: #B5AAA1; }
     .made-with a { color: inherit; }
   </style>
@@ -110,7 +116,12 @@
   </div>
 
   <p class="couple-link">Are you the couple? <a href="#" id="loginLink">Open your gallery</a></p>
-  <p class="made-with">Made with <a href="/" target="_blank">Confetti</a> · <a href="/privacy" target="_blank">Privacy</a></p>
+  <a class="promo" id="promo" href="/" target="_blank" hidden>
+    <b>Getting married?</b>
+    <span>Collect every photo from your own wedding with one QR code.</span>
+    <em>Make your own gallery</em>
+  </a>
+  <p class="made-with">Made with <a href="/" target="_blank" id="madeWith">Confetti</a> · <a href="/privacy" target="_blank">Privacy</a></p>
 </main>
 
 <script src="/static/confetti.js"></script>
@@ -147,6 +158,12 @@
   let selectedFiles = [];
 
   loginLink.href = `/e/${SLUG}/gallery`;
+
+  // WED-23: links back to Confetti carry this gallery's slug, so we can count
+  // couples who found us through a wedding.
+  const $promo = document.getElementById("promo");
+  $promo.href = `/?ref=${encodeURIComponent(SLUG)}`;
+  document.getElementById("madeWith").href = `/?ref=${encodeURIComponent(SLUG)}`;
 
   // Remember the guest's name so a second batch later in the night is one tap.
   try { nameInput.value = localStorage.getItem("confetti_guest_name") || ""; } catch {}
@@ -319,6 +336,7 @@
 
     if (fail === 0) {
       showToast(`All ${ok} file${ok === 1 ? "" : "s"} uploaded. Thank you! 🎉`, "success");
+      $promo.hidden = false;   // WED-23: only after a successful upload
       window.confettiBurst();
     } else if (ok === 0) {
       showToast(`All uploads failed. Check your connection and try again.`, "error");

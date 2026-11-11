@@ -38,7 +38,7 @@ import emailcheck
 import mailer
 import payments
 import storage
-from db import Event, PasswordReset, SessionLocal, get_db, init_db, now_utc
+from db import AccessCode, Event, PasswordReset, SessionLocal, get_db, init_db, now_utc
 from security import hash_password, verify_password
 
 log = logging.getLogger("confetti")
@@ -74,7 +74,11 @@ async def _cleanup_loop():
 def _cleanup_once() -> list[str]:
     db = SessionLocal()
     try:
-        return run_cleanup(db)
+        deleted = run_cleanup(db)
+        freeup = run_freeup(db)
+        if any(freeup.values()):
+            log.info("Storage free-up: %s", freeup)
+        return deleted
     finally:
         db.close()
 
@@ -145,6 +149,13 @@ def _activate(ev: Event) -> None:
     ev.expires_at = ev.paid_at + timedelta(days=config.EVENT_TTL_DAYS)
 
 
+def _referrer(db: Session, ref: str | None) -> str | None:
+    """The referring gallery's slug, only if it really exists."""
+    if ref and db.query(Event.id).filter(Event.slug == ref).first():
+        return ref
+    return None
+
+
 def _send_welcome(ev: Event) -> None:
     """Welcome email with the gallery link and QR code (runs after the response)."""
     if ev.contact_email:
@@ -174,8 +185,14 @@ def _unique_slug(db: Session) -> str:
 # Page routes (serve static HTML shells; the JS reads the slug from the URL)
 # ---------------------------------------------------------------------------
 
+REF_RE = re.compile(r"^[a-z0-9]{4,16}$")
+
+
 @app.get("/")
-def landing_page():
+def landing_page(request: Request, ref: str | None = None):
+    # WED-23: remember which gallery's guest page sent this visitor.
+    if ref and REF_RE.match(ref):
+        request.session["ref"] = ref
     return FileResponse("static/landing.html")
 
 
@@ -280,9 +297,21 @@ def create_event(body: CreateEventRequest, request: Request, background: Backgro
                  db: Session = Depends(get_db)):
     email = _normalize_email(body.email)
 
-    # A valid comp code lets a friend skip payment even when Stripe is on.
+    # A valid code skips payment even when Stripe is on: a partner's code from
+    # the database (WED-24) or the single FREE_ACCESS_CODE from the environment.
     code = (body.access_code or "").strip()
-    code_ok = bool(config.FREE_ACCESS_CODE) and code == config.FREE_ACCESS_CODE
+    partner_code = None
+    code_ok = False
+    if code:
+        partner_code = db.get(AccessCode, code.upper())
+        if partner_code and partner_code.active:
+            if partner_code.max_uses is not None and partner_code.uses >= partner_code.max_uses:
+                raise HTTPException(status_code=400, detail="That access code has already been used up.")
+            code_ok = True
+        elif config.FREE_ACCESS_CODE and code == config.FREE_ACCESS_CODE:
+            code_ok, partner_code = True, None
+        else:
+            partner_code = None
     if code and not code_ok and config.PAYMENTS_ENABLED:
         # Say so, rather than silently sending them to checkout.
         raise HTTPException(status_code=400, detail="That access code isn't valid.")
@@ -311,6 +340,7 @@ def create_event(body: CreateEventRequest, request: Request, background: Backgro
             # Readable R2 folder: couple name + slug (slug guarantees uniqueness,
             # since two different couples can share the same names).
             storage_prefix=f"{slugify_names(body.couple_names)}-{slug}",
+            referred_by=_referrer(db, request.session.get("ref")),
         )
 
     if config.PAYMENTS_ENABLED and not code_ok:
@@ -322,6 +352,10 @@ def create_event(body: CreateEventRequest, request: Request, background: Backgro
 
     # Free path: stub mode (no Stripe) OR a valid comp code — unlock immediately.
     _activate(ev)
+    if code_ok:
+        ev.access_code = partner_code.code if partner_code else "FREE_ACCESS_CODE"
+        if partner_code:
+            partner_code.uses += 1
     db.add(ev)
     db.commit()
     background.add_task(_send_welcome, ev)
@@ -509,6 +543,10 @@ def get_upload_url(slug: str, body: UploadRequest, db: Session = Depends(get_db)
     if ev.status != "active":
         raise HTTPException(status_code=403, detail="This gallery isn't active yet.")
 
+    if ev.freeup_warned_at or ev.files_freed_at:
+        # New photos arriving means the gallery is in use again (WED-34).
+        ev.freeup_warned_at = ev.files_freed_at = None
+        db.commit()
     key = (
         storage.photos_prefix(_storage_key(ev))
         + f"{sanitize_name(body.guest_name)}/{uuid.uuid4()}-{sanitize_filename(body.filename)}"
@@ -636,6 +674,8 @@ def download_zip(slug: str, request: Request, db: Session = Depends(get_db)):
     existing = storage.head(zip_key)
     if not existing or existing.get("Metadata", {}).get("sig") != sig:
         _build_zip(objects, prefix, zip_key, sig)
+    ev.last_download_at = now_utc()   # WED-34
+    db.commit()
 
     return RedirectResponse(storage.presign_get(zip_key, download_as=ZIP_NAME), status_code=302)
 
@@ -670,7 +710,32 @@ def delete_all_photos(slug: str, request: Request, db: Session = Depends(get_db)
     key = _storage_key(ev)
     deleted = storage.delete_prefix(storage.photos_prefix(key))
     storage.delete_prefix(storage.exports_prefix(key))
+    ev.all_deleted_at = now_utc()   # WED-34
+    ev.freeup_warned_at = None
+    db.commit()
     return {"ok": True, "deleted": deleted}
+
+
+@app.get("/api/e/{slug}/storage")
+def storage_status(slug: str, request: Request, db: Session = Depends(get_db)):
+    """What the gallery page needs to show the free-up banner (couple only)."""
+    ev = get_event_or_404(db, slug)
+    require_event_auth(request, slug)
+    clear_on = None
+    if ev.freeup_warned_at:
+        clear_on = (_aware(ev.freeup_warned_at) + FREEUP_GRACE).date().isoformat()
+    return {"downloaded": ev.last_download_at is not None, "clear_on": clear_on}
+
+
+@app.post("/api/e/{slug}/keep")
+def keep_photos(slug: str, request: Request, db: Session = Depends(get_db)):
+    """Couple chose to keep their photos online: cancel the free-up and restart the clock."""
+    ev = get_event_or_404(db, slug)
+    require_event_auth(request, slug)
+    ev.freeup_warned_at = None
+    ev.last_download_at = now_utc()
+    db.commit()
+    return {"ok": True}
 
 
 # ---------------------------------------------------------------------------
@@ -700,14 +765,139 @@ def run_cleanup(db: Session) -> list[str]:
     return deleted
 
 
+# WED-34: free up storage for galleries the couple has already taken home.
+ZIP_CACHE_TTL = timedelta(days=3)     # the cached "Download all" zip doubles storage
+FREEUP_AFTER = timedelta(days=60)     # downloaded + no new uploads for this long -> warn
+FREEUP_GRACE = timedelta(days=14)     # then clear the photos this long after the warning
+
+
+def run_freeup(db: Session) -> dict:
+    """Daily storage housekeeping; the couple is always warned before photos go."""
+    now = now_utc()
+    zips_cleared, warned, freed = [], [], []
+    candidates = (db.query(Event)
+                  .filter(Event.status == "active", Event.last_download_at.isnot(None), Event.files_freed_at.is_(None))
+                  .all())
+    for ev in candidates:
+        key = _storage_key(ev)
+        downloaded = _aware(ev.last_download_at)
+        if now - downloaded > ZIP_CACHE_TTL and storage.delete_prefix(storage.exports_prefix(key)):
+            zips_cleared.append(ev.slug)
+        photos = storage.list_prefix(storage.photos_prefix(key))
+        if not photos:
+            continue
+        newest = max(_aware(o["LastModified"]) for o in photos)
+        if newest > downloaded:
+            continue   # new photos since the download: the couple hasn't got everything
+        if now - downloaded < FREEUP_AFTER:
+            continue
+        if not ev.freeup_warned_at:
+            ev.freeup_warned_at = now
+            if ev.contact_email:
+                mailer.freeup_warning(ev.contact_email, ev.couple_names,
+                                      f"{config.PUBLIC_BASE_URL}/e/{ev.slug}/gallery",
+                                      (now + FREEUP_GRACE).strftime("%-d %B %Y"))
+            warned.append(ev.slug)
+        elif now - _aware(ev.freeup_warned_at) >= FREEUP_GRACE:
+            storage.delete_prefix(storage.photos_prefix(key))
+            storage.delete_prefix(storage.exports_prefix(key))
+            ev.files_freed_at = now
+            freed.append(ev.slug)
+    db.commit()
+    return {"zips_cleared": zips_cleared, "warned": warned, "freed": freed}
+
+
+def _require_admin(request: Request) -> None:
+    if not config.ADMIN_TOKEN or request.headers.get("x-admin-token") != config.ADMIN_TOKEN:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+
 @app.post("/api/admin/cleanup")
 def cleanup(request: Request, db: Session = Depends(get_db)):
     """Run the cleanup now. It also runs daily on its own (see _cleanup_loop).
     Protected by ADMIN_TOKEN:  curl -X POST -H 'X-Admin-Token: ...' /api/admin/cleanup"""
-    if not config.ADMIN_TOKEN or request.headers.get("x-admin-token") != config.ADMIN_TOKEN:
-        raise HTTPException(status_code=401, detail="Unauthorized")
+    _require_admin(request)
     deleted = run_cleanup(db)
-    return {"deleted": deleted, "count": len(deleted)}
+    return {"deleted": deleted, "count": len(deleted), "freeup": run_freeup(db)}
+
+
+@app.get("/api/admin/report")
+def admin_report(request: Request, db: Session = Depends(get_db)):
+    """Every gallery with its storage use and housekeeping dates (WED-34)."""
+    _require_admin(request)
+    iso = lambda d: _aware(d).isoformat() if d else None
+    rows, total_bytes = [], 0
+    for ev in db.query(Event).order_by(Event.created_at.desc()).all():
+        objs = storage.list_prefix(storage.event_root(_storage_key(ev)))
+        photos = [o for o in objs if "/photos/" in o["Key"]]
+        size = sum(o.get("Size", 0) for o in objs)
+        total_bytes += size
+        rows.append({
+            "slug": ev.slug, "names": ev.couple_names, "email": ev.contact_email, "status": ev.status,
+            "created_at": iso(ev.created_at), "paid_at": iso(ev.paid_at), "expires_at": iso(ev.expires_at),
+            "referred_by": ev.referred_by, "access_code": ev.access_code, "photos": len(photos), "bytes": size,
+            "last_upload": iso(max((o["LastModified"] for o in photos), default=None)),
+            "last_download_at": iso(ev.last_download_at), "all_deleted_at": iso(ev.all_deleted_at),
+            "freeup_warned_at": iso(ev.freeup_warned_at), "files_freed_at": iso(ev.files_freed_at),
+        })
+    return {
+        "totals": {
+            "galleries": len(rows), "active": sum(r["status"] == "active" for r in rows),
+            "paid": sum(1 for r in rows if r["paid_at"]), "from_guests": sum(1 for r in rows if r["referred_by"]),
+            "photos": sum(r["photos"] for r in rows), "bytes": total_bytes,
+            "gb": round(total_bytes / 1e9, 3),
+        },
+        "galleries": rows,
+    }
+
+
+class CodeRequest(BaseModel):
+    code: str
+    partner: str
+    max_uses: int | None = 2
+
+    @field_validator("code")
+    @classmethod
+    def check_code(cls, v: str) -> str:
+        v = v.strip().upper()
+        if not re.fullmatch(r"[A-Z0-9-]{4,40}", v):
+            raise ValueError("Codes are 4–40 letters, numbers or dashes.")
+        return v
+
+
+@app.get("/api/admin/codes")
+def list_codes(request: Request, db: Session = Depends(get_db)):
+    _require_admin(request)
+    counts = dict(db.query(Event.access_code, func.count(Event.id)).group_by(Event.access_code).all())
+    return [{"code": c.code, "partner": c.partner, "max_uses": c.max_uses, "uses": c.uses, "active": c.active,
+             "galleries": counts.get(c.code, 0), "created_at": _aware(c.created_at).isoformat()}
+            for c in db.query(AccessCode).order_by(AccessCode.created_at.desc()).all()]
+
+
+@app.post("/api/admin/codes")
+def create_code(body: CodeRequest, request: Request, db: Session = Depends(get_db)):
+    _require_admin(request)
+    if db.get(AccessCode, body.code):
+        raise HTTPException(status_code=409, detail="That code already exists.")
+    db.add(AccessCode(code=body.code, partner=body.partner.strip()[:120], max_uses=body.max_uses))
+    db.commit()
+    return {"ok": True, "code": body.code}
+
+
+@app.post("/api/admin/codes/{code}/toggle")
+def toggle_code(code: str, request: Request, db: Session = Depends(get_db)):
+    _require_admin(request)
+    c = db.get(AccessCode, code.upper())
+    if not c:
+        raise HTTPException(status_code=404, detail="No such code.")
+    c.active = not c.active
+    db.commit()
+    return {"ok": True, "active": c.active}
+
+
+@app.get("/admin")
+def admin_page():
+    return FileResponse("static/admin.html")
 
 
 # ---------------------------------------------------------------------------
