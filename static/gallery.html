@@ -51,13 +51,6 @@
       background: var(--accent-soft); border-radius: var(--radius); padding: .9rem 1.1rem; margin-bottom: 1.25rem; }
     .notice p { margin: 0; color: var(--ink-soft); font-size: .92rem; flex: 1 1 260px; }
     .notice b { color: var(--ink); }
-    .invite-promo { display: flex; align-items: center; gap: 1rem; text-decoration: none; color: var(--ink-soft);
-      background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-lg); padding: .75rem 1.1rem .75rem .75rem;
-      margin-bottom: 1.5rem; box-shadow: var(--shadow); font-size: .9rem; }
-    .invite-promo img { width: 44px; height: 78px; object-fit: cover; border-radius: 8px; flex-shrink: 0; }
-    .invite-promo > span { flex: 1; }
-    .invite-promo b { display: block; color: var(--ink); font-size: 1rem; }
-    .invite-promo em { font-style: normal; color: var(--accent); font-weight: 600; }
     .notice .btn-soft { background: var(--surface); }
     .notice .btn-soft:hover:not(:disabled) { background: #fff; border-color: #EBC6C0; }
     @media (max-width: 600px) {
@@ -132,6 +125,7 @@
 <header class="topbar sticky">
   <a href="#" class="brand brand-full" id="brandLink" title="Back to top"><img src="/static/favicon.svg" alt="" /><span id="brand">Gallery</span></a>
   <div class="header-actions" id="headerActions" style="display:none">
+    <a class="btn btn-ghost btn-sm" id="homeLink" hidden>← Home</a>
     <button class="btn btn-ghost btn-sm" id="logoutBtn">Log out</button>
   </div>
 </header>
@@ -177,12 +171,6 @@
     <img class="share-qr" id="galleryQr" alt="Guest upload QR code" />
   </div>
 
-  <a class="invite-promo" id="invitePromo" href="#">
-    <img src="/static/invite/envelope-start.jpg" alt="" />
-    <span><b id="promoTitle">Invitation + RSVP</b><span id="promoText">Send guests an invitation that opens like a real envelope, and see who's coming.</span></span>
-    <em id="promoGo">Try it</em>
-  </a>
-
   <div class="notice" id="freeNotice" hidden>
     <p><b>Got everything?</b> Once your download has finished, you can free up your gallery.</p>
     <button class="btn btn-soft btn-sm" id="freeUpBtn" type="button">Free up gallery</button>
@@ -223,18 +211,12 @@
   // ── Multi-tenant: derive this event's slug from the URL (/e/<slug>/gallery)
   const SLUG = location.pathname.split("/")[2] || "";
   const API  = `/api/e/${SLUG}`;
-  document.getElementById("invitePromo").href = `/e/${SLUG}/invite`;
-  // WED-36: what this account has. Invitation-only accounts don't have a gallery.
+  document.getElementById("homeLink").href = `/e/${SLUG}/home`;
+  // WED-36: invitation-only accounts have no gallery; accounts with both get a Home link.
   fetch(`${API}/account`).then((r) => r.ok ? r.json() : null).then((acc) => {
     if (!acc) return;
     if (!acc.photos) { location.replace(acc.home); return; }
-    if (acc.invite) {
-      document.getElementById("promoTitle").textContent = "Your invitation + RSVP";
-      document.getElementById("promoText").textContent = "Edit it, send it, and see who's coming.";
-      document.getElementById("promoGo").textContent = "Open";
-    } else {
-      document.getElementById("promoGo").textContent = "Try it free";
-    }
+    if (acc.invite) document.getElementById("homeLink").hidden = false;
   }).catch(() => {});
 
   // ── State ──────────────────────────────────────────────────────────────

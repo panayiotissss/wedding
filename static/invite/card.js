@@ -22,6 +22,7 @@
     "&family=Playfair+Display:ital,wght@0,400;0,500;1,400&family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&display=swap";
 
   const CSS = `
+  /* The page's "reduce motion" rule would make the writing instant; this card is meant to animate. */
   .cc { position: absolute; inset: 0; container-type: size; display: flex; align-items: center; justify-content: center; pointer-events: none; }
   .cc-in { width: 84%; display: flex; flex-direction: column; align-items: center; text-align: center; color: #2E2620; transform-origin: center; }
   .cc-kicker { font-size: 2.7cqw; letter-spacing: .3em; text-transform: uppercase; color: #8A6D3B; font-weight: 600; }
@@ -37,19 +38,19 @@
   .cc.anim .cc-names { -webkit-mask-image: linear-gradient(90deg, #000 45%, transparent 55%); mask-image: linear-gradient(90deg, #000 45%, transparent 55%);
     -webkit-mask-size: 250% 100%; mask-size: 250% 100%; -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
     -webkit-mask-position: 100% 0; mask-position: 100% 0; }
-  .cc.anim.go .cc-names { animation: ccWrite var(--write, 2.6s) linear var(--wd, .5s) forwards; }
+  .cc.anim.go .cc-names { animation: ccWrite var(--write, 2.6s) linear var(--wd, .5s) forwards !important; }
   @keyframes ccWrite { to { -webkit-mask-position: 0 0; mask-position: 0 0; } }
   .cc-nib { position: absolute; top: 50%; left: -25%; width: 3.2cqw; height: 3.2cqw; margin: -1.6cqw 0 0 -1.6cqw; border-radius: 50%;
     background: radial-gradient(circle, rgba(255,236,180,.95), rgba(228,178,90,.5) 45%, transparent 70%); opacity: 0; }
-  .cc.anim.go .cc-nib { animation: ccNib var(--write, 2.6s) linear var(--wd, .5s) forwards; }
+  .cc.anim.go .cc-nib { animation: ccNib var(--write, 2.6s) linear var(--wd, .5s) forwards !important; }
   @keyframes ccNib { 0% { left: -25%; opacity: 0; } 18% { opacity: 1; } 82% { opacity: 1; } 100% { left: 125%; opacity: 0; } }
 
   /* Typing: each letter appears in turn. */
   .cc.anim .cc-ch { opacity: 0; }
-  .cc.anim.go .cc-ch { animation: ccType .28s ease-out forwards; }
+  .cc.anim.go .cc-ch { animation-name: ccType !important; animation-duration: .28s !important; animation-timing-function: ease-out !important; animation-fill-mode: forwards !important; }
   @keyframes ccType { from { opacity: 0; filter: blur(2px); } to { opacity: 1; filter: none; } }
   .cc.anim .cc-rule { transform: scaleX(0); }
-  .cc.anim.go .cc-rule { animation: ccRule .8s ease-out var(--rd, 3s) forwards; }
+  .cc.anim.go .cc-rule { animation: ccRule .8s ease-out var(--rd, 3s) forwards !important; }
   @keyframes ccRule { to { transform: scaleX(1); } }
   `;
 

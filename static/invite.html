@@ -174,7 +174,9 @@
 (async function () {
   const $ = (id) => document.getElementById(id);
   const slug = location.pathname.split("/")[2];
-  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  // The opening and the writing ARE the invitation, so they always play, even when
+  // the computer asks for fewer animations (Windows/Mac setting).
+  const reduce = false;
   const CARD_AT = 7.6;  // seconds: the card has settled in the video by now
 
   let inv;

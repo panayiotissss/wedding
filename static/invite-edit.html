@@ -126,6 +126,7 @@
     <div class="side">
       <section class="card">
         <div class="phone"><div class="host" id="pvHost"></div></div>
+        <p class="center" style="margin:-.25rem 0 1.25rem"><button class="btn btn-soft btn-sm" type="button" id="playBtn">▶ Watch it write</button></p>
 
         <div id="shareBox" hidden>
           <h2>Send it to your guests</h2>
@@ -216,7 +217,15 @@
 
   let pv = null;
   function renderPreview() { pv = ConfettiCard.render($("pvHost"), values(), { animate: false }); }
-  markFont(); renderPreview(); dirty();
+  function playPreview() {
+    pv = ConfettiCard.render($("pvHost"), values(), { animate: true });
+    requestAnimationFrame(() => pv.play());
+  }
+  $("playBtn").onclick = playPreview;
+  markFont(); dirty();
+  // Show it writing once when the page opens; while typing, the preview updates instantly.
+  (document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve()).then(() => setTimeout(playPreview, 400));
+  renderPreview();
   FIELDS.forEach((f) => $(f).addEventListener("input", () => { renderPreview(); if (f === "names") markFont(); dirty(); }));
   addEventListener("resize", () => pv && pv.fit());
 
