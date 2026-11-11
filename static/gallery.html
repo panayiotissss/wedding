@@ -16,8 +16,6 @@
     @media (max-width: 520px) { .hide-sm { display: none; } }
 
     /* Login */
-    #loginScreen { display: flex; align-items: center; justify-content: center; min-height: calc(100vh - 70px); padding: 2rem 1rem; }
-    #loginScreen .card { width: 100%; max-width: 400px; }
     .login-error { margin-top: .9rem; padding: .7rem 1rem; border-radius: 12px; background: var(--err-soft); color: var(--err); font-size: .9rem; text-align: center; display: none; }
 
     /* Gallery */
@@ -125,23 +123,10 @@
 <header class="topbar">
   <a href="/" class="brand"><img src="/static/favicon.svg" alt="" /><span>Confetti</span></a>
   <nav class="nav header-actions" id="headerActions" style="display:none">
-    <a class="nav-link" id="homeLink">Home</a>
-    <button class="nav-link" type="button" id="logoutBtn">Log out</button>
+    <a class="btn btn-sm" id="homeLink">Home</a>
+    <button class="btn btn-sm" type="button" id="logoutBtn">Log out</button>
   </nav>
 </header>
-
-<!-- Login form -->
-<div id="loginScreen">
-  <div class="card">
-    <h1 class="page-title">Your gallery</h1>
-    <p class="page-sub">Enter your gallery password to see your photos.</p>
-    <label class="label" for="passwordInput">Password</label>
-    <input class="input" type="password" id="passwordInput" placeholder="Gallery password" autocomplete="current-password" style="margin-bottom:1rem" />
-    <button class="btn btn-lg btn-block" id="loginBtn">Enter gallery</button>
-    <div class="login-error" id="loginError">Wrong password. Try again.</div>
-    <p class="foot-note"><a href="/forgot">Forgot password?</a> · <a href="/login">Log in with your email</a></p>
-  </div>
-</div>
 
 <!-- Gallery (shown after login) -->
 <div id="galleryScreen">
@@ -165,7 +150,7 @@
       <div class="share-link"><code id="guestLink"></code></div>
       <div class="share-actions">
         <button class="btn btn-soft btn-sm" id="copyLink" type="button">Copy link</button>
-        <a class="btn btn-ghost btn-sm" id="downloadQr" download="wedding_qr.png">⬇ QR code</a>
+        <a class="btn btn-ghost btn-sm" id="downloadQr" download="wedding_qr.png">Download QR code</a>
       </div>
     </div>
     <img class="share-qr" id="galleryQr" alt="Guest upload QR code" />
@@ -259,12 +244,8 @@
 
   // ── DOM refs ───────────────────────────────────────────────────────────
 
-  const loginScreen   = document.getElementById("loginScreen");
   const galleryScreen = document.getElementById("galleryScreen");
   const headerActions = document.getElementById("headerActions");
-  const passwordInput = document.getElementById("passwordInput");
-  const loginBtn      = document.getElementById("loginBtn");
-  const loginError    = document.getElementById("loginError");
   const galleryContent= document.getElementById("galleryContent");
   const statsLabel    = document.getElementById("statsLabel");
   const deleteAllBtn  = document.getElementById("deleteAllBtn");
@@ -289,53 +270,18 @@
     try {
       const res = await fetch(`${API}/me`);
       const { authenticated } = await res.json();
-      if (authenticated) {
-        showGallery();
-        loadPhotos();
-      }
-    } catch { /* network error: stay on login screen */ }
+      if (!authenticated) return toLogin();
+      showGallery();
+      loadPhotos();
+    } catch { /* network error: try again on refresh */ }
   })();
 
   // ── Login ──────────────────────────────────────────────────────────────
 
-  loginBtn.addEventListener("click", doLogin);
-  passwordInput.addEventListener("keydown", e => { if (e.key === "Enter") doLogin(); });
-
-  async function doLogin() {
-    const pw = passwordInput.value;
-    if (!pw) return;
-
-    loginBtn.disabled = true;
-    loginBtn.textContent = "Checking…";
-    loginError.style.display = "none";
-
-    try {
-      const res = await fetch(`${API}/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password: pw }),
-      });
-
-      if (res.ok) {
-        passwordInput.value = "";
-        showGallery();
-        loadPhotos();
-      } else {
-        loginError.style.display = "block";
-        loginBtn.disabled = false;
-        loginBtn.textContent = "Enter gallery";
-        passwordInput.focus();
-      }
-    } catch {
-      loginError.textContent = "Network error. Please try again.";
-      loginError.style.display = "block";
-      loginBtn.disabled = false;
-      loginBtn.textContent = "Enter gallery";
-    }
-  }
+  // Not logged in: the one login page for the whole account.
+  const toLogin = () => location.replace("/login");
 
   function showGallery() {
-    loginScreen.style.display   = "none";
     galleryScreen.style.display = "block";
     headerActions.style.display = "flex";
   }
@@ -344,13 +290,7 @@
 
   logoutBtn.addEventListener("click", async () => {
     await fetch(`${API}/logout`, { method: "POST" });
-    galleryScreen.style.display = "none";
-    headerActions.style.display = "none";
-    loginScreen.style.display   = "flex";
-    loginBtn.disabled = false;
-    loginBtn.textContent = "Enter gallery";
-    galleryContent.innerHTML = '<div class="state-msg"><div class="spinner"></div>Loading photos…</div>';
-    allPhotos = [];
+    location.href = "/login";
   });
 
   // ── Load photos ─────────────────────────────────────────────────────────
@@ -390,9 +330,7 @@
       const res = await fetch(`${API}/photos`);
       if (res.status === 401) {
         // Session expired
-        galleryScreen.style.display = "none";
-        headerActions.style.display = "none";
-        loginScreen.style.display   = "flex";
+        toLogin();
         return;
       }
       const groups = await res.json(); // [{guest, photos:[{url,key,filename,uploaded_at}]}]
@@ -608,9 +546,7 @@
     try {
       const res = await fetch(`${API}/delete-all`, { method: "POST" });
       if (res.status === 401) {
-        galleryScreen.style.display = "none";
-        headerActions.style.display = "none";
-        loginScreen.style.display   = "flex";
+        toLogin();
         return;
       }
       if (!res.ok) throw new Error(`Server error ${res.status}`);

@@ -703,3 +703,14 @@ def test_success_page_goes_home_once_paid(client, signup):
     _stripe_webhook(client, _checkout_completed(_event(slug).id))
     r = client.get("/create/success", follow_redirects=False)
     assert r.status_code == 303 and r.headers["location"] == f"/e/{slug}/home"
+
+
+def test_logged_in_visitors_are_remembered(client, signup):
+    assert client.get("/api/session").json() == {"logged_in": False}
+    slug = _account(signup, "photos")["slug"]
+    s = client.get("/api/session").json()
+    assert s["logged_in"] and s["home"] == f"/e/{slug}/home"
+    r = client.get("/login", follow_redirects=False)
+    assert r.status_code == 303 and r.headers["location"] == f"/e/{slug}/home"
+    client.post(f"/api/e/{slug}/logout")
+    assert client.get("/login", follow_redirects=False).status_code == 200

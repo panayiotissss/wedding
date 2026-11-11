@@ -89,7 +89,7 @@
 <body>
 <header class="topbar">
   <a href="/" class="brand"><img src="/static/favicon.svg" alt="" /><span>Confetti</span></a>
-  <nav class="nav"><a class="nav-link" id="backLink" href="#">Home</a><a class="nav-link" id="logout" href="#">Log out</a></nav>
+  <nav class="nav"><a class="btn btn-sm" id="backLink" href="#">Home</a><a class="btn btn-sm" id="logout" href="#">Log out</a></nav>
 </header>
 <main>
   <h1 class="on-forest">Your invitation</h1>
@@ -208,6 +208,7 @@
   const res = await fetch(`${API}/invitation`);
   if (res.status === 401) { location.href = "/login"; return; }
   const inv = await res.json();
+  let autoTimer = null;   // autosave (see below)
   const state = { theme: DESIGNS[inv.theme] ? inv.theme : "linen", font: inv.font || "classic", sections: inv.sections || [] };
   FIELDS.forEach((f) => { $(f).value = inv[f] || ""; });
   // A new invitation starts from the design's own content: ready to read, easy to change or delete.
@@ -222,7 +223,9 @@
   if (!inv.saved || !state.sections.length) applyStarter(state.theme);
 
   $("backLink").href = `/e/${slug}/home`;
-  $("logout").onclick = async (e) => { e.preventDefault(); await fetch(`${API}/logout`, { method: "POST" }); location.href = "/login"; };
+  // Leaving always keeps the work: save first, then go.
+  $("backLink").onclick = async (e) => { e.preventDefault(); await saveIfNeeded(); location.href = `/e/${slug}/home`; };
+  $("logout").onclick = async (e) => { e.preventDefault(); await saveIfNeeded(); await fetch(`${API}/logout`, { method: "POST" }); location.href = "/login"; };
 
   function values() {
     const o = { kind: "site", theme: state.theme, font: state.font, sections: state.sections.map(({ url, ...s }) => s) };
@@ -233,7 +236,12 @@
   function previewData() { const v = values(); v.sections = state.sections; v.upload_url = null; return v; }
   let saved = inv.saved ? JSON.stringify(values()) : null;
   const isDirty = () => JSON.stringify(values()) !== saved;
-  function changed(replay) { $("saveMsg").textContent = isDirty() ? "" : "Saved"; schedulePreview(replay === true); }
+  function changed(replay) {
+    $("saveMsg").textContent = isDirty() ? "" : "Saved";
+    schedulePreview(replay === true);
+    clearTimeout(autoTimer);
+    if (isDirty()) autoTimer = setTimeout(() => { if (isDirty()) save(); }, 1500);
+  }
 
   // ── Design ──────────────────────────────────────────────────────
   function renderLooks() {
@@ -396,7 +404,14 @@
     if (await save()) { if (w) w.location = `/i/${slug}`; else location.href = `/i/${slug}`; } else if (w) w.close();
   });
   for (const id of ["waBtn", "viberBtn", "smsBtn", "mailBtn", "copyBtn", "nativeBtn"]) $(id).addEventListener("click", () => { if (isDirty()) save(); }, true);
-  addEventListener("beforeunload", (e) => { if (isDirty()) { e.preventDefault(); e.returnValue = ""; } });
+  // Autosave: a moment after each change, and when the tab is closed or hidden.
+  async function saveIfNeeded() { clearTimeout(autoTimer); if (isDirty()) await save(); }
+  function keepalive() {
+    if (!isDirty()) return;
+    fetch(`${API}/invitation`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(values()), keepalive: true });
+  }
+  addEventListener("pagehide", keepalive);
+  document.addEventListener("visibilitychange", () => { if (document.hidden) keepalive(); });
   $("buyBtn").onclick = async () => { if (!isDirty() || await save()) ConfettiAccount.buy(slug, "invite"); };
 
   function renderShare() {

@@ -271,8 +271,30 @@ def success_page(request: Request, slug: str | None = None, db: Session = Depend
     return FileResponse("static/success.html")
 
 
+def _session_slug(request: Request) -> str | None:
+    """The account this browser is logged in to, if any (the most recent one)."""
+    auth = request.session.get("auth_events", [])
+    last = request.session.get("last_slug")
+    return last if last in auth else (auth[-1] if auth else None)
+
+
+@app.get("/api/session")
+def session_info(request: Request, db: Session = Depends(get_db)):
+    """Lets public pages show 'My account' instead of 'Log in'."""
+    slug = _session_slug(request)
+    ev = db.query(Event).filter(Event.slug == slug).first() if slug else None
+    if not ev or ev.status != "active":
+        return {"logged_in": False}
+    return {"logged_in": True, "home": _home_url(ev), "names": ev.couple_names}
+
+
 @app.get("/login")
-def login_page():
+def login_page(request: Request, db: Session = Depends(get_db)):
+    # Already logged in: no need to log in again.
+    slug = _session_slug(request)
+    ev = db.query(Event).filter(Event.slug == slug).first() if slug else None
+    if ev and ev.status == "active":
+        return RedirectResponse(_home_url(ev), status_code=303)
     return FileResponse("static/login.html")
 
 
