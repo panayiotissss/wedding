@@ -9,7 +9,7 @@
   <meta property="og:description" content="A wedding invitation your guests scroll through and reply to in a single tap." />
   <meta property="og:image" content="https://confettiwedding.net/static/invite/og-linen.jpg" />
   <meta property="og:type" content="website" />
-  <meta name="theme-color" content="#1C1714" />
+  <meta name="theme-color" content="#22332B" />
   <link rel="icon" href="/static/favicon.svg" type="image/svg+xml" />
   <link rel="apple-touch-icon" href="/static/logo-512.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -31,7 +31,7 @@
   </script>
   <style>
     :root {
-      --night: #1C1714; --night-2: #2A231E; --ivory: #F3EDE4; --paper: #FBF7F1; --ink: #1C1714; --ink-2: #5E544B; --muted: #8D8277;
+      --night: #22332B; --night-2: #2C4036; --ivory: #F3EDE4; --paper: #FBF7F1; --ink: #1F2B25; --ink-2: #4D5A52; --muted: #858679;
       --clay: #B5523F; --clay-2: #9E4535; --gold: #D9B77A; --line: rgba(28,23,20,.12); --line-d: rgba(243,237,228,.14);
       --serif: "Instrument Serif", "Times New Roman", serif; --sans: "Instrument Sans", -apple-system, "Segoe UI", sans-serif;
       --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.5'/%3E%3C/svg%3E");
@@ -43,6 +43,15 @@
     img { display: block; max-width: 100%; }
     .wrap { max-width: 1120px; margin: 0 auto; padding: 0 22px; }
     .dark { background: var(--night); color: var(--ivory); position: relative; isolation: isolate; }
+    /* Sections melt into each other instead of switching hard between green and ivory. */
+    header.dark { background: linear-gradient(180deg in oklab, var(--night) 0, var(--night) calc(100% - 240px), var(--ivory) 100%); }
+    .stmt.dark { background: linear-gradient(180deg in oklab, var(--ivory) 0, var(--night) 220px, var(--night) calc(100% - 220px), var(--ivory) 100%);
+      padding: 220px 0 !important; }
+    .end.dark { background: linear-gradient(180deg in oklab, var(--ivory) 0, var(--night) 230px); padding-top: 240px !important; }
+    @supports not (background: linear-gradient(in oklab, red, blue)) {
+      header.dark { background: linear-gradient(180deg, var(--night) 0, var(--night) calc(100% - 240px), var(--ivory) 100%); }
+      .stmt.dark { background: linear-gradient(180deg, var(--ivory) 0, var(--night) 220px, var(--night) calc(100% - 220px), var(--ivory) 100%); }
+      .end.dark { background: linear-gradient(180deg, var(--ivory) 0, var(--night) 230px); } }
     .dark::after { content: ""; position: absolute; inset: 0; background-image: var(--grain); opacity: .08; mix-blend-mode: overlay; pointer-events: none; z-index: -1; }
     h1, h2 { font-family: var(--serif); font-weight: 400; letter-spacing: -.015em; }
     h1 em, h2 em { font-style: italic; color: var(--gold); }
@@ -65,7 +74,7 @@
     .nav a.in:hover { color: var(--ivory); }
 
     /* Hero: the product first */
-    .hero { padding: 12px 0 72px; }
+    .hero { padding: 12px 0 190px; }
     .hero .grid { display: grid; gap: 26px; grid-template-areas: "copy" "stage" "cta"; }
     .hero .copy { grid-area: copy; } .hero .stage { grid-area: stage; } .hero .cta { grid-area: cta; }
     @media (min-width: 900px) { .hero .grid { grid-template-columns: 1fr 1fr; grid-template-areas: "copy stage" "cta stage"; column-gap: 64px; row-gap: 0; padding-top: 36px; align-items: end; }
@@ -75,7 +84,7 @@
     @media (max-width: 899px) { .hero .copy { text-align: center; } .hero p { margin: 12px auto 0; } .hero h1 { font-size: clamp(44px, 12vw, 60px); } }
 
     .stage { display: flex; flex-direction: column; align-items: center; gap: 22px; }
-    .phone { display: block; width: min(64vw, 300px); aspect-ratio: 9 / 18.6; border-radius: 46px; padding: 9px; background: #0B0908;
+    .phone { display: block; width: min(64vw, 300px); aspect-ratio: 9 / 18.6; border-radius: 46px; padding: 9px; background: #121A16;
       box-shadow: 0 50px 100px rgba(0,0,0,.55), 0 0 0 1px rgba(255,255,255,.07); }
     .phone .scr { width: 100%; height: 100%; border-radius: 38px; overflow: hidden; position: relative; background: #111; }
     .phone iframe { position: absolute; top: 0; left: 0; width: 390px; height: 806px; border: 0; transform-origin: 0 0; pointer-events: none; }
@@ -144,10 +153,10 @@
     /* End */
     .end { text-align: center; padding: 110px 0; }
     .end h2 { font-size: clamp(54px, 9vw, 120px); line-height: .92; margin-bottom: 40px; }
-    footer { padding: 30px 0 40px; font-size: 14px; color: var(--muted); }
+    footer { padding: 30px 0 40px; font-size: 14px; color: rgba(243,237,228,.55); background: var(--night); }
     footer .wrap { display: flex; flex-wrap: wrap; gap: 8px 22px; }
     footer .wrap span { margin-right: auto; }
-    footer a:hover { color: var(--ink); }
+    footer a:hover { color: var(--ivory); }
 
     /* Phones: one button that stays in reach */
     .sticky { position: fixed; left: 14px; right: 14px; bottom: calc(14px + env(safe-area-inset-bottom)); z-index: 30;
@@ -243,7 +252,7 @@
       <details><summary>Do guests need an app?</summary><p>No. They tap your link and it opens.</p></details>
       <details><summary>Can we see the designs first?</summary><p>Yes. Tap the designs at the top of this page.</p></details>
       <details><summary>Who sees the photos?</summary><p>Only you.</p></details>
-      <details><summary>Can we add the other one later?</summary><p>Yes, any time from your account.</p></details>
+      <details><summary>Can we add the other feature later?</summary><p>Yes. Add it from your account whenever you like.</p></details>
     </div>
   </section>
 

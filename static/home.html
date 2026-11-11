@@ -8,23 +8,24 @@
   <link rel="icon" href="/static/favicon.svg" type="image/svg+xml" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/static/app.css" />
   <style>
     main { max-width: 860px; margin: 0 auto; padding: 1rem 1.25rem 4rem; }
-    h1 { font-family: var(--serif); font-size: 2.6rem; font-weight: 600; line-height: 1.1; text-align: center; }
-    .lead { text-align: center; color: var(--muted); margin: .4rem 0 2rem; }
+    h1 { font-family: var(--serif); font-size: 2.6rem; font-weight: 400; line-height: 1.1; text-align: center; }
+    h1 { margin-bottom: 2rem; }
     .tiles { display: grid; gap: 1.1rem; grid-template-columns: 1fr; }
     @media (min-width: 640px) { .tiles { grid-template-columns: 1fr 1fr; } }
     .tile { display: flex; flex-direction: column; text-decoration: none; color: var(--ink); background: var(--surface);
       border: 1px solid var(--line); border-radius: var(--radius-lg); overflow: hidden; box-shadow: var(--shadow); transition: transform .15s; }
     .tile:hover { transform: translateY(-2px); }
-    .tile .pic { height: 180px; background-size: cover; background-position: center; }
+    .tile .pic { display: block; height: 180px; background-size: cover; background-position: center; }
     .tile .body { padding: 1.1rem 1.25rem 1.3rem; }
-    .tile h2 { font-family: var(--serif); font-size: 1.6rem; font-weight: 600; }
+    .tile h2 { font-family: var(--serif); font-size: 1.6rem; font-weight: 400; }
     .tile p { color: var(--ink-soft); font-size: .92rem; margin: .25rem 0 .9rem; }
-    .tile .go { color: var(--accent); font-weight: 600; }
-    .pic.photos { background: linear-gradient(135deg, #F4E1D6, #E9C9B6); display: flex; align-items: center; justify-content: center; font-size: 4rem; }
+    .tile .btn { margin-top: .4rem; }
+    .tile.locked .pic { filter: grayscale(.6); opacity: .7; }
+    .pic.photos { background: #FBF7F1 url("/static/qr-demo.svg") center / 34% no-repeat; }
     .pic.invite { background-image: url("/static/invite/thumb-noir.jpg"); background-position: center 42%; }
   </style>
 </head>
@@ -35,16 +36,15 @@
 </header>
 <main>
   <h1 id="title">Your wedding</h1>
-  <p class="lead">Everything for your guests, before and on the day.</p>
   <div class="tiles">
-    <a class="tile" id="inviteTile" href="#">
-      <div class="pic invite"></div>
-      <div class="body"><h2>Invitation + RSVP</h2><p>Edit your invitation, send it to guests and see who's coming.</p><span class="go">Open →</span></div>
-    </a>
-    <a class="tile" id="photosTile" href="#">
-      <div class="pic photos">📸</div>
-      <div class="body"><h2>Photo gallery</h2><p>Your QR code, and every photo your guests take.</p><span class="go">Open →</span></div>
-    </a>
+    <article class="tile" id="invite">
+      <a class="pic invite" href="#" tabindex="-1" aria-hidden="true"></a>
+      <div class="body"><h2>Invitation</h2><p>Your invitation and every reply.</p><a class="btn btn-block" href="#">Open</a></div>
+    </article>
+    <article class="tile" id="photos">
+      <a class="pic photos" href="#" tabindex="-1" aria-hidden="true"></a>
+      <div class="body"><h2>Photo gallery</h2><p>Your QR code and every guest's photos.</p><a class="btn btn-block" href="#">Open</a></div>
+    </article>
   </div>
 </main>
 <script src="/static/dialog.js"></script>
@@ -55,11 +55,18 @@
   const slug = location.pathname.split("/")[2];
   const acc = await ConfettiAccount.get(slug);
   if (!acc) { location.href = "/login"; return; }
-  // One product only: go straight to it.
-  if (acc.home !== `/e/${slug}/home`) { location.replace(acc.home); return; }
   document.getElementById("title").textContent = acc.names;
-  document.getElementById("inviteTile").href = `/e/${slug}/invite`;
-  document.getElementById("photosTile").href = `/e/${slug}/gallery`;
+  const pages = { invite: `/e/${slug}/invite`, photos: `/e/${slug}/gallery` };
+  for (const product of ["invite", "photos"]) {
+    const tile = document.getElementById(product), btn = tile.querySelector(".btn"), pic = tile.querySelector(".pic");
+    pic.href = pages[product];
+    if (acc[product]) { btn.href = pages[product]; continue; }
+    // Not bought yet: the same tile, with the price on the button.
+    tile.classList.add("locked");
+    btn.textContent = `Add · €${acc.prices[product]}`;
+    btn.classList.add("btn-soft");
+    btn.onclick = pic.onclick = (e) => { e.preventDefault(); ConfettiAccount.buy(slug, product); };
+  }
   document.getElementById("logout").onclick = async (e) => {
     e.preventDefault(); await fetch(`/api/e/${slug}/logout`, { method: "POST" }); location.href = "/login";
   };

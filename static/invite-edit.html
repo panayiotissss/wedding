@@ -8,16 +8,16 @@
   <link rel="icon" href="/static/favicon.svg" type="image/svg+xml" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/static/app.css" />
   <style>
     main { max-width: 1080px; margin: 0 auto; padding: .5rem 1.25rem 4rem; }
-    h1 { font-family: var(--serif); font-size: 2.4rem; font-weight: 600; line-height: 1.1; margin-bottom: 1.25rem; }
+    h1 { font-family: var(--serif); font-size: 2.4rem; font-weight: 400; line-height: 1.1; margin-bottom: 1.25rem; }
     .grid { display: grid; gap: 1.25rem; grid-template-columns: 1fr; align-items: start; }
     @media (min-width: 920px) { .grid { grid-template-columns: 1.15fr 1fr; } .side { position: sticky; top: 1rem; } }
     .card { padding: 1.4rem 1.2rem; margin-bottom: 1.25rem; }
     @media (min-width: 520px) { .card { padding: 1.6rem 1.6rem; } }
-    .card h2 { font-family: var(--serif); font-size: 1.55rem; font-weight: 600; margin-bottom: 1rem; }
+    .card h2 { font-family: var(--serif); font-size: 1.55rem; font-weight: 400; margin-bottom: 1rem; }
     .group { border-top: 1px solid var(--line); padding-top: 1.1rem; margin-top: .3rem; }
     .group h3 { font-size: .78rem; letter-spacing: .14em; text-transform: uppercase; color: var(--accent); margin-bottom: .8rem; }
     textarea.input { resize: vertical; min-height: 84px; }
@@ -30,7 +30,7 @@
     .looks { display: grid; grid-template-columns: repeat(5, 1fr); gap: .5rem; }
     @media (max-width: 560px) { .looks { grid-template-columns: repeat(3, 1fr); } }
     .look { border: 1.5px solid var(--line); border-radius: 14px; background: #FFFDFB; padding: .45rem .45rem .55rem; cursor: pointer; text-align: center; font: inherit; color: var(--ink); }
-    .look[aria-checked="true"] { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(158,79,69,.12); }
+    .look[aria-checked="true"] { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(181,82,63,.12); }
     .look:disabled { cursor: default; opacity: .55; }
     .look .thumb { aspect-ratio: 9/16; border-radius: 9px; background-size: cover; background-position: center; }
     .look .thumb em { font-style: normal; font-size: 1.35rem; line-height: 1.2; padding: 0 .3rem; }
@@ -89,7 +89,7 @@
 <body>
 <header class="topbar">
   <a href="/" class="brand"><img src="/static/favicon.svg" alt="" /><span>Confetti</span></a>
-  <nav class="nav"><a class="nav-link" id="backLink" href="#" hidden></a><a class="nav-link" id="logout" href="#">Log out</a></nav>
+  <nav class="nav"><a class="nav-link" id="backLink" href="#">Home</a><a class="nav-link" id="logout" href="#">Log out</a></nav>
 </header>
 <main>
   <h1>Your invitation</h1>
@@ -99,7 +99,7 @@
       <section class="card" aria-labelledby="styleH">
         <h2 id="styleH">Design</h2>
         <div class="looks" id="looks" role="radiogroup" aria-label="Design"></div>
-        <p class="hint" style="margin-top:.8rem"><span id="lookNote"></span> <a id="demoLink" target="_blank" rel="noopener">See it full screen ↗</a></p>
+        <p class="hint" style="margin-top:.8rem"><span id="lookNote"></span> <a id="demoLink" target="_blank" rel="noopener">See it full screen</a></p>
       </section>
 
       <section class="card" aria-labelledby="fontsH">
@@ -137,7 +137,7 @@
 
       <div class="savebar">
         <button class="btn" type="submit" id="saveBtn">Save</button>
-        <a class="btn btn-ghost" id="previewBtn" target="_blank" rel="noopener">Open ↗</a>
+        <a class="btn btn-ghost" id="previewBtn" target="_blank" rel="noopener">Open</a>
         <span class="hint" id="saveMsg"></span>
       </div>
       <div class="alert alert-error" id="formErr" role="alert"></div>
@@ -221,11 +221,7 @@
   }
   if (!inv.saved || !state.sections.length) applyStarter(state.theme);
 
-  if (inv.has_photos) {
-    $("backLink").hidden = false;
-    $("backLink").textContent = inv.has_invite ? "← Home" : "← Gallery";
-    $("backLink").href = inv.has_invite ? `/e/${slug}/home` : `/e/${slug}/gallery`;
-  }
+  $("backLink").href = `/e/${slug}/home`;
   $("logout").onclick = async (e) => { e.preventDefault(); await fetch(`${API}/logout`, { method: "POST" }); location.href = "/login"; };
 
   function values() {

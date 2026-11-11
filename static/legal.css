@@ -1,6 +1,6 @@
 /* Confetti legal pages (Terms, Privacy): same look as the landing page. */
 :root {
-  --night: #1C1714; --ivory: #F3EDE4; --paper: #FBF7F1; --ink: #1C1714; --ink-2: #4E453D; --muted: #8D8277;
+  --night: #22332B; --ivory: #F3EDE4; --paper: #FBF7F1; --ink: #1F2B25; --ink-2: #4D5A52; --muted: #858679;
   --clay: #B5523F; --gold: #D9B77A; --line: rgba(28,23,20,.12); --line-d: rgba(243,237,228,.14);
   --serif: "Instrument Serif", "Times New Roman", serif; --sans: "Instrument Sans", -apple-system, "Segoe UI", sans-serif;
 }
@@ -10,16 +10,16 @@ body { font-family: var(--sans); background: var(--ivory); color: var(--ink); li
 a { color: var(--clay); }
 .wrap { max-width: 1120px; margin: 0 auto; padding: 0 22px; }
 
-header { background: var(--night); color: var(--ivory); }
+header { background: linear-gradient(180deg in oklab, var(--night) 0, var(--night) calc(100% - 150px), var(--ivory) 100%); color: var(--ivory); }
 .nav { display: flex; align-items: center; height: 68px; }
 .logo { font-family: var(--serif); font-size: 27px; display: flex; align-items: center; gap: 10px; margin-right: auto; color: var(--ivory); text-decoration: none; }
 .logo img { width: 26px; height: 26px; border-radius: 7px; }
 .nav a.in { font-size: 15px; color: rgba(243,237,228,.8); text-decoration: none; padding: 10px 4px 10px 16px; }
-.title { padding: 56px 0 64px; }
+.title { padding: 56px 0 140px; }
 .title h1 { font-family: var(--serif); font-weight: 400; font-size: clamp(52px, 9vw, 104px); line-height: .95; letter-spacing: -.015em; }
 .title p { color: rgba(243,237,228,.6); margin-top: 14px; font-size: 15px; }
 
-.layout { display: grid; gap: 48px; padding: 56px 0 96px; }
+.layout { display: grid; gap: 48px; padding: 8px 0 96px; }
 @media (min-width: 960px) { .layout { grid-template-columns: 220px 1fr; gap: 80px; } }
 .toc { display: none; }
 @media (min-width: 960px) { .toc { display: block; position: sticky; top: 28px; align-self: start; } }

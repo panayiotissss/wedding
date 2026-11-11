@@ -1,7 +1,7 @@
 // Small confetti burst for success moments (payment done, upload done).
 window.confettiBurst = function (count) {
   if (window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-  const colors = ["#9E4F45", "#E4B25A", "#F6D9D2", "#2B2420", "#C98B7F"];
+  const colors = ["#B5523F", "#D9B77A", "#F2DFD8", "#22332B", "#8FA58F"];
   for (let i = 0; i < (count || 70); i++) {
     const p = document.createElement("div");
     p.className = "confetti-piece";

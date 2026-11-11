@@ -22,7 +22,7 @@
       const msg = Array.isArray(d.detail) ? d.detail[0].msg.replace(/^Value error, /, "") : (d.detail || "Please try again.");
       return ConfettiDialog.alert({ title: "Couldn't add it", body: msg });
     }
-    location.href = d.payment_url || (product === "invite" ? `/e/${slug}/invite` : `/e/${slug}/gallery`);
+    location.href = d.payment_url || d.next || `/e/${slug}/home`;
   }
   window.ConfettiAccount = {
     buy,

@@ -329,12 +329,9 @@ PLANS = {"photos", "invite", "bundle"}
 
 
 def _home_url(ev: Event) -> str:
-    """Where a couple lands after login/payment: the one thing they have, or both."""
-    if ev.photos and ev.invite:
-        return f"/e/{ev.slug}/home"
-    if ev.invite:
-        return f"/e/{ev.slug}/invite"
-    return f"/e/{ev.slug}/gallery"
+    """Where a couple lands after login or payment: their home page, which
+    shows both features (open what they have, add what they don't)."""
+    return f"/e/{ev.slug}/home"
 
 
 class CreateEventRequest(BaseModel):

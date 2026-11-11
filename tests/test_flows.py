@@ -523,7 +523,7 @@ def test_plan_without_a_link_yet_says_so(signup):
 
 def test_invite_only_account_has_no_gallery_uploads(client, signup):
     acc = _account(signup, "invite")
-    assert acc["next"] == f"/e/{acc['slug']}/invite"
+    assert acc["next"] == f"/e/{acc['slug']}/home"
     me = client.get(f"/api/e/{acc['slug']}/account").json()
     assert me["invite"] and not me["photos"]
     up = client.post(f"/api/e/{acc['slug']}/upload-url", json={
@@ -533,7 +533,7 @@ def test_invite_only_account_has_no_gallery_uploads(client, signup):
 
 
 def test_login_goes_to_what_the_couple_has(client, signup):
-    for plan, email, where in (("photos", "p@example.com", "gallery"), ("invite", "i@example.com", "invite"),
+    for plan, email, where in (("photos", "p@example.com", "home"), ("invite", "i@example.com", "home"),
                                ("bundle", "b@example.com", "home")):
         slug = signup(email=email, access_code="FREE-TEST", plan=plan).json()["slug"]
         res = client.post("/api/login", json={"email": email, "password": "Wedding2026"}).json()

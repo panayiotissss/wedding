@@ -4,12 +4,12 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Gallery · Confetti</title>
-  <meta name="theme-color" content="#FBF7F2" />
+  <meta name="theme-color" content="#F3EDE4" />
   <link rel="icon" href="/static/favicon.svg" type="image/svg+xml" />
   <link rel="apple-touch-icon" href="/static/favicon.svg" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/static/app.css" />
   <style>
     .header-actions { display: flex; gap: .5rem; align-items: center; flex-shrink: 0; }
@@ -23,7 +23,7 @@
     /* Gallery */
     #galleryScreen { display: none; max-width: 1180px; margin: 0 auto; padding: 1.25rem 1rem 4rem; }
     .gal-head { display: flex; align-items: flex-end; justify-content: space-between; flex-wrap: wrap; gap: .75rem; margin: .5rem 0 1.25rem; }
-    .gal-head h1 { font-family: var(--serif); font-size: clamp(2rem, 6vw, 2.8rem); font-weight: 600; line-height: 1.05; }
+    .gal-head h1 { font-family: var(--serif); font-size: clamp(2rem, 6vw, 2.8rem); font-weight: 400; line-height: 1.05; }
     .count { color: var(--muted); font-size: .95rem; margin-top: .25rem; }
     .gal-tools { display: flex; gap: .5rem; flex-wrap: wrap; }
     .brand-full span { white-space: normal; overflow: visible; line-height: 1.1; }
@@ -83,7 +83,7 @@
 
     .guest-section { margin-bottom: 2.25rem; scroll-margin-top: 80px; }
     .guest-header { display: flex; align-items: baseline; gap: .6rem; margin-bottom: .75rem; }
-    .guest-name { font-family: var(--serif); font-size: 1.5rem; font-weight: 600; text-transform: capitalize; }
+    .guest-name { font-family: var(--serif); font-size: 1.5rem; font-weight: 400; text-transform: capitalize; }
     .guest-count { font-size: .82rem; color: var(--muted); }
 
     .photo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; }
@@ -125,7 +125,7 @@
 <header class="topbar sticky">
   <a href="#" class="brand brand-full" id="brandLink" title="Back to top"><img src="/static/favicon.svg" alt="" /><span id="brand">Gallery</span></a>
   <div class="header-actions" id="headerActions" style="display:none">
-    <a class="btn btn-ghost btn-sm" id="homeLink" hidden>← Home</a>
+    <a class="btn btn-ghost btn-sm" id="homeLink">Home</a>
     <button class="btn btn-ghost btn-sm" id="logoutBtn">Log out</button>
   </div>
 </header>
@@ -216,7 +216,6 @@
   fetch(`${API}/account`).then((r) => r.ok ? r.json() : null).then((acc) => {
     if (!acc) return;
     if (!acc.photos) { location.replace(acc.home); return; }
-    if (acc.invite) document.getElementById("homeLink").hidden = false;
   }).catch(() => {});
 
   // ── State ──────────────────────────────────────────────────────────────
