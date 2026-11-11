@@ -59,7 +59,7 @@ def _layout(inner: str) -> str:
 </tr></table>
 {inner}
 </td></tr></table>
-<p style="color:#8C8077;font-size:12px;margin-top:16px">Confetti · Made with ❤ for the people getting married</p>
+<p style="color:#8C8077;font-size:12px;margin-top:16px">Confetti · Made with ❤ for people getting married</p>
 </td></tr></table></body></html>"""
 
 
