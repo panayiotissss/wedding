@@ -204,7 +204,8 @@ def landing_page(request: Request, ref: str | None = None):
 
 
 # For search engines and AI agents: what's public, what the product is, where to start.
-_PUBLIC_PAGES = ["/", "/create", "/login", "/terms", "/privacy"]
+_PUBLIC_PAGES = ["/", "/create", "/login", "/terms", "/privacy",
+                 "/demo/linen", "/demo/garden", "/demo/noir", "/demo/riviera", "/demo/bloom"]
 
 
 @app.get("/robots.txt", include_in_schema=False)
@@ -232,7 +233,8 @@ def llms_txt():
 > Wedding invitations with RSVP, and a QR code that collects every guest's photos into one private gallery. One-time prices, no subscription, no app for guests.
 
 ## Products
-- Invitation + RSVP, EUR 20: an animated invitation (a film or a scrolling website) sent as one link; guests reply in one tap; the couple sees a live list and can export CSV.
+- Invitation + RSVP, EUR 20: an animated wedding website invitation in one of five designs (Linen, Garden, Noir, Riviera, Bloom), sent as one link; guests reply in one tap; the couple sees a live list and can export CSV.
+- Live demos: {base}/demo/linen, {base}/demo/garden, {base}/demo/noir, {base}/demo/riviera, {base}/demo/bloom
 - Photo gallery, EUR 25: one QR code; guests upload full-quality photos and videos from their phone browser; only the couple can view; live for 12 months.
 - Both, EUR 39.
 
