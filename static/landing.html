@@ -57,7 +57,7 @@
     body { font-family: var(--sans); background: var(--ivory); color: var(--ink); line-height: 1.5; -webkit-font-smoothing: antialiased; overflow-x: hidden; }
     a { color: inherit; text-decoration: none; }
     img { display: block; max-width: 100%; }
-    .wrap { max-width: 1120px; margin: 0 auto; padding: 0 22px; }
+    .wrap { max-width: 1080px; margin: 0 auto; padding: 0 20px; }
     .dark { background: var(--night); color: var(--ivory); position: relative; isolation: isolate; }
     /* Sections melt into each other instead of switching hard between green and ivory. */
     header.dark { background: linear-gradient(180deg in oklab, var(--night) 0, var(--night) calc(100% - 240px), var(--ivory) 100%); }
@@ -86,7 +86,7 @@
     .nav { display: flex; align-items: center; height: 68px; }
     .logo { font-family: var(--serif); font-size: 27px; display: flex; align-items: center; gap: 10px; margin-right: auto; }
     .logo img { width: 28px; height: 28px; border-radius: 7px; }
-    footer .flogo { font-size: 27px; color: var(--ivory); margin-right: auto; }
+    footer .wrap span { margin-right: auto; }
     .nav a.in { font-size: 15px; color: rgba(243,237,228,.8); padding: 10px 4px 10px 16px; }
     .nav a.in:hover { color: var(--ivory); }
     .nav .btn.login { height: 40px; padding: 0 18px; font-size: 14px; border-radius: 12px; }
@@ -147,6 +147,15 @@
     .qrcard .names { font-family: "Great Vibes", cursive; font-size: 40px; line-height: 1; }
     .qrcard img { width: 62%; }
 
+    /* Reviews: real couples' own words only */
+    .reviews { padding: 40px 0 40px; }
+    .reviews h2 { font-size: clamp(42px, 6vw, 76px); line-height: .98; text-align: center; margin-bottom: 40px; }
+    .quotes { display: grid; gap: 14px; max-width: 980px; margin: 0 auto; }
+    @media (min-width: 900px) { .quotes { grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); } }
+    .quote { background: var(--paper); border-radius: 22px; padding: 28px 26px; box-shadow: 0 20px 44px rgba(31,43,37,.07); }
+    .quote p { font-family: var(--serif); font-size: 24px; line-height: 1.25; }
+    .quote footer { background: none; padding: 16px 0 0; font-family: var(--sans); font-size: 14px; color: var(--ink-2); }
+
     /* Pricing: three rows */
     .prices { padding: 96px 0; }
     .prices h2 { font-size: clamp(42px, 6vw, 76px); line-height: .98; text-align: center; margin-bottom: 40px; }
@@ -194,7 +203,7 @@
 <header class="dark">
   <div class="wrap">
     <nav class="nav" aria-label="Main">
-      <a href="/" class="logo"><img src="/static/logo.png" alt="" />Confetti</a>
+      <a href="/" class="logo"><img src="/static/favicon.svg" alt="" />Confetti</a>
       <a href="/login" class="btn login" data-account>Log in</a>
     </nav>
   </div>
@@ -257,6 +266,13 @@
     </div>
   </section>
 
+  <section class="reviews" id="reviews" aria-labelledby="rv-h" hidden>
+    <div class="wrap">
+      <h2 id="rv-h" class="rv">Loved by <em>real couples.</em></h2>
+      <div class="quotes" id="quotes"></div>
+    </div>
+  </section>
+
   <section class="prices" id="pricing" aria-labelledby="pr">
     <div class="wrap">
       <h2 id="pr" class="rv">Pay once.</h2>
@@ -287,7 +303,7 @@
 
 <footer>
   <div class="wrap">
-    <a href="/" class="logo flogo"><img src="/static/logo.png" alt="" />Confetti</a>
+    <span>Confetti™</span>
     <a href="/login" data-account>Log in</a><a href="/terms">Terms</a><a href="/privacy">Privacy</a><a href="mailto:support@confettiwedding.net">Support</a>
   </div>
 </footer>
@@ -316,6 +332,17 @@
   $("chips").addEventListener("click", (e) => { const b = e.target.closest("button"); if (b && b.dataset.id !== current) show(b.dataset.id); });
   fit(); addEventListener("resize", fit);
   if (document.readyState === "complete") show("linen"); else addEventListener("load", () => show("linen"));
+
+  // Reviews: the couples' own words, with their permission. Empty = section hidden.
+  const REVIEWS = [
+    // { names: "Orestis & Athina", text: "…their exact words…" },
+    // { names: "Charis & Andreas", text: "…their exact words…" },
+  ];
+  if (REVIEWS.length) {
+    $("quotes").innerHTML = REVIEWS.map(() => `<figure class="quote rv"><p></p><footer></footer></figure>`).join("");
+    [...$("quotes").children].forEach((q, i) => { q.querySelector("p").textContent = `“${REVIEWS[i].text}”`; q.querySelector("footer").textContent = REVIEWS[i].names; });
+    $("reviews").hidden = false;
+  }
 
   // Reveal, and start each small demo when it comes into view.
   const io = new IntersectionObserver((es) => es.forEach((e) => {

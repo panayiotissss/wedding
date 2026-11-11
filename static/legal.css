@@ -8,13 +8,12 @@
 html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; scroll-padding-top: 24px; }
 body { font-family: var(--sans); background: var(--ivory); color: var(--ink); line-height: 1.65; -webkit-font-smoothing: antialiased; }
 a { color: var(--clay); }
-.wrap { max-width: 1120px; margin: 0 auto; padding: 0 22px; }
+.wrap { max-width: 1080px; margin: 0 auto; padding: 0 20px; }
 
 header { background: linear-gradient(180deg in oklab, var(--night) 0, var(--night) calc(100% - 150px), var(--ivory) 100%); color: var(--ivory); }
 .nav { display: flex; align-items: center; height: 68px; }
 .logo { font-family: var(--serif); font-size: 27px; display: flex; align-items: center; gap: 10px; margin-right: auto; color: var(--ivory); text-decoration: none; }
 .logo img { width: 28px; height: 28px; border-radius: 7px; }
-footer .logo { color: var(--ink); font-size: 27px; }
 .nav a.in { font-size: 15px; color: rgba(243,237,228,.8); text-decoration: none; padding: 10px 4px 10px 16px; }
 .title { padding: 56px 0 140px; }
 .title h1 { font-family: var(--serif); font-weight: 400; font-size: clamp(52px, 9vw, 104px); line-height: .95; letter-spacing: -.015em; }
