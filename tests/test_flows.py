@@ -82,7 +82,7 @@ def test_free_access_code_skips_payment(client, signup):
     assert res.status_code == 200
     data = res.json()
     assert data["status"] == "active"
-    assert data["payment_url"] == f"/create/success?slug={data['slug']}"
+    assert data["payment_url"] == f"/e/{data['slug']}/home"
     assert _event(data["slug"]).paid_at is not None
 
 
@@ -694,3 +694,12 @@ def test_cleanup_also_removes_the_invitation_and_rsvps(client, signup, monkeypat
         db.commit()
         assert main.run_cleanup(db) == [slug]
         assert db.query(Invitation).count() == 0 and db.query(Rsvp).count() == 0
+
+
+def test_success_page_goes_home_once_paid(client, signup):
+    res = signup()  # paid plan: waits for Stripe
+    slug = res.json()["slug"]
+    assert client.get("/create/success", follow_redirects=False).status_code == 200   # still confirming
+    _stripe_webhook(client, _checkout_completed(_event(slug).id))
+    r = client.get("/create/success", follow_redirects=False)
+    assert r.status_code == 303 and r.headers["location"] == f"/e/{slug}/home"

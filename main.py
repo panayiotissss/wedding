@@ -9,7 +9,7 @@ Each couple ("event") gets:
   - auto-deletion 1 year after payment          (WED-6)
 
 Onboarding is self-serve + pay:
-  /  →  /create  →  Stripe Payment Link  →  webhook activates  →  /create/success
+  /  →  /create  →  Stripe Payment Link  →  webhook activates  →  /create/success  →  /e/<slug>/home
 (WED-2 multi-user, WED-7 pay-to-unlock).
 """
 
@@ -259,7 +259,15 @@ def create_page():
 
 
 @app.get("/create/success")
-def success_page():
+def success_page(request: Request, slug: str | None = None, db: Session = Depends(get_db)):
+    """Where Stripe sends couples after paying. Straight to their home page once
+    the payment is confirmed; until the webhook lands, a short 'confirming' screen
+    that moves on by itself."""
+    slug = slug or request.session.get("last_slug")
+    ev = db.query(Event).filter(Event.slug == slug).first() if slug else None
+    addon = request.session.get("pending_addon")
+    if ev and ev.status == "active" and (not addon or getattr(ev, addon, False)):
+        return RedirectResponse(_home_url(ev), status_code=303)
     return FileResponse("static/success.html")
 
 
@@ -446,7 +454,7 @@ def create_event(body: CreateEventRequest, request: Request, background: Backgro
     _grant_auth(request, ev.slug)
     request.session["last_slug"] = ev.slug
     request.session.pop("pending_addon", None)
-    return {"slug": ev.slug, "status": ev.status, "payment_url": f"/create/success?slug={ev.slug}",
+    return {"slug": ev.slug, "status": ev.status, "payment_url": _home_url(ev),
             "next": _home_url(ev)}
 
 

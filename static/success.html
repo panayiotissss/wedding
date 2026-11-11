@@ -3,131 +3,46 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Your gallery is ready · Confetti</title>
-  <meta name="theme-color" content="#F3EDE4" />
+  <meta name="robots" content="noindex" />
+  <title>Confirming your payment · Confetti</title>
+  <meta name="theme-color" content="#22332B" />
   <link rel="icon" href="/static/favicon.svg" type="image/svg+xml" />
-  <link rel="apple-touch-icon" href="/static/favicon.svg" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/static/app.css" />
-  <style>
-    .stepper { display: flex; justify-content: center; gap: .5rem; margin-bottom: 1.25rem; font-size: .78rem; color: var(--muted); }
-    .stepper span { padding: .3rem .7rem; border-radius: 999px; background: var(--bg-deep); }
-    .stepper span.on { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
-    .qr-card {
-      margin: 1.25rem auto; width: 240px; padding: 14px 14px 10px; border-radius: 20px;
-      background: #fff; border: 1px solid var(--line); text-align: center;
-    }
-    .qr-card img { width: 212px; height: 212px; margin: 0 auto; }
-    .qr-card .qr-names { font-family: var(--serif); font-size: 1.15rem; font-weight: 400; margin-top: .25rem; }
-    .qr-card .qr-cta { font-size: .72rem; color: var(--muted); letter-spacing: .08em; text-transform: uppercase; }
-    .actions { display: grid; gap: .6rem; margin-top: 1.25rem; }
-    .section-label { font-size: .8rem; font-weight: 600; color: var(--ink-soft); margin-top: 1.4rem; }
-    .next { margin-top: 1.5rem; padding-top: 1.25rem; border-top: 1px solid var(--line); }
-    .next ol { padding-left: 1.2rem; color: var(--ink-soft); font-size: .92rem; }
-    .next li { margin: .3rem 0; }
-  </style>
 </head>
 <body>
-
 <header class="topbar">
   <a href="/" class="brand"><img src="/static/favicon.svg" alt="" /><span>Confetti</span></a>
 </header>
-
 <main class="narrow">
-  <div class="stepper"><span>1 · Your details</span><span>2 · Payment</span><span class="on">3 · Your QR code</span></div>
-  <div class="card">
-    <div class="state" id="waiting">
-      <div class="spinner"></div>
-      Confirming your payment…<br>This usually takes a few seconds.
-    </div>
-
-    <div id="ready" style="display:none">
-      <h1 class="page-title">You're all set! 🎉</h1>
-      <p class="page-sub" id="readySub">Your gallery is live.</p>
-
-      <div id="inviteBlock" hidden style="text-align:center;margin-bottom:1.5rem">
-        <img src="/static/invite/thumb-linen.jpg" alt="" style="width:120px;height:213px;object-fit:cover;border-radius:14px;margin:0 auto 1rem;box-shadow:var(--shadow)" />
-        <a class="btn btn-block" id="openInvite" href="#">Create my invitation</a>
-      </div>
-
-      <div id="photosBlock">
-      <div class="qr-card">
-        <img id="qrImg" alt="Your QR code" />
-        <div class="qr-cta">Scan to share your photos</div>
-        <div class="qr-names" id="qrNames"></div>
-      </div>
-
-      <div class="actions">
-        <a class="btn btn-soft btn-block" id="qrDownload" download="wedding_qr.png">Download QR code</a>
-        <a class="btn btn-block" id="openGallery" href="#">Open my gallery</a>
-      </div>
-
-      <div class="next">
-        <div class="section-label" style="margin-top:0">What to do next</div>
-        <ol>
-          <li>Scan the QR yourself to test it.</li>
-          <li>Print it on table cards, menus or a welcome sign.</li>
-          <li>Open your gallery during and after the wedding to see photos arrive.</li>
-        </ol>
-      </div>
-      </div>
-    </div>
+  <div class="card state" id="state" role="status">
+    <div class="spinner"></div>
+    <h1 class="page-title">Confirming your payment</h1>
   </div>
 </main>
-
-<script src="/static/confetti.js"></script>
 <script>
   "use strict";
-  const params = new URLSearchParams(location.search);
-  const waiting = document.getElementById("waiting");
-  const ready   = document.getElementById("ready");
-
-  let slug = params.get("slug");
-  let waitFor = null;  // an add-on bought from inside the account: wait for it
-
-  // After a Stripe Payment Link, the return URL has no slug, so recover the
-  // gallery this session just created.
+  // Stripe sends couples here; once the payment is confirmed they go to their home page.
   (async () => {
-    if (!slug) {
-      try { const l = await (await fetch("/api/my-latest")).json(); slug = l.slug; waitFor = l.addon; } catch {}
-    }
-    if (!slug) {
-      waiting.innerHTML = "We couldn't find your gallery. <a href='/login'>Log in</a> or <a href='/create'>start again</a>.";
-      return;
-    }
-    poll();
+    const params = new URLSearchParams(location.search);
+    let slug = params.get("slug"), addon = null;
+    try { const l = await (await fetch("/api/my-latest")).json(); slug = slug || l.slug; addon = l.addon; } catch {}
+    if (!slug) { location.replace("/login"); return; }
+    let tries = 0;
+    (async function poll() {
+      try {
+        const r = await fetch(`/api/events/${encodeURIComponent(slug)}/status`);
+        if (r.ok) {
+          const info = await r.json();
+          if (info.status === "active" && (!addon || info[addon])) { location.replace(info.next); return; }
+        }
+      } catch { /* try again */ }
+      if (++tries > 40) { location.replace("/login"); return; }   // ~2 minutes: let them log in instead
+      setTimeout(poll, 3000);
+    })();
   })();
-
-  async function poll() {
-    try {
-      const res = await fetch(`/api/events/${slug}/status`);
-      if (res.ok) {
-        const info = await res.json();
-        if (info.status === "active" && (!waitFor || info[waitFor])) return showReady(info);
-      }
-    } catch { /* retry */ }
-    setTimeout(poll, 2500);
-  }
-
-  function showReady(info) {
-    const galleryUrl = `${location.origin}/e/${slug}/gallery`;
-
-    const what = info.photos && info.invite ? "invitation and gallery are" : info.invite ? "invitation is" : "gallery is";
-    document.getElementById("readySub").textContent = `${info.names ? info.names + ", your" : "Your"} ${what} ready.`;
-    if (info.names) document.getElementById("qrNames").textContent = info.names;
-    document.getElementById("photosBlock").hidden = !info.photos;
-    document.getElementById("inviteBlock").hidden = !info.invite;
-    document.getElementById("openInvite").href = `/e/${slug}/invite`;
-    document.getElementById("qrImg").src = `/e/${slug}/qr.png`;
-    document.getElementById("qrDownload").href = `/e/${slug}/qr.png`;
-    document.getElementById("openGallery").href = galleryUrl;
-
-    waiting.style.display = "none";
-    ready.style.display = "block";
-    window.confettiBurst();
-  }
 </script>
 </body>
 </html>
