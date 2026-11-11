@@ -38,7 +38,7 @@ import emailcheck
 import mailer
 import payments
 import storage
-from db import AccessCode, Event, PasswordReset, SessionLocal, get_db, init_db, now_utc
+from db import AccessCode, Event, Invitation, PasswordReset, Rsvp, SessionLocal, get_db, init_db, now_utc
 from security import hash_password, verify_password
 
 log = logging.getLogger("confetti")
@@ -292,6 +292,25 @@ class CreateEventRequest(BaseModel):
         return emailcheck.check_email(v)
 
 
+def _check_access_code(db: Session, code: str) -> tuple[bool, "AccessCode | None"]:
+    """Validate an access code: a partner's code from the database (WED-24) or
+    the single FREE_ACCESS_CODE from the environment. Raises a clear 400 for a
+    used-up code, and for an unknown one when payments are on."""
+    if not code:
+        return False, None
+    partner_code = db.get(AccessCode, code.upper())
+    if partner_code and partner_code.active:
+        if partner_code.max_uses is not None and partner_code.uses >= partner_code.max_uses:
+            raise HTTPException(status_code=400, detail="That access code has already been used up.")
+        return True, partner_code
+    if config.FREE_ACCESS_CODE and code == config.FREE_ACCESS_CODE:
+        return True, None
+    if config.PAYMENTS_ENABLED:
+        # Say so, rather than silently sending them to checkout.
+        raise HTTPException(status_code=400, detail="That access code isn't valid.")
+    return False, None
+
+
 @app.post("/api/events")
 def create_event(body: CreateEventRequest, request: Request, background: BackgroundTasks,
                  db: Session = Depends(get_db)):
@@ -300,21 +319,7 @@ def create_event(body: CreateEventRequest, request: Request, background: Backgro
     # A valid code skips payment even when Stripe is on: a partner's code from
     # the database (WED-24) or the single FREE_ACCESS_CODE from the environment.
     code = (body.access_code or "").strip()
-    partner_code = None
-    code_ok = False
-    if code:
-        partner_code = db.get(AccessCode, code.upper())
-        if partner_code and partner_code.active:
-            if partner_code.max_uses is not None and partner_code.uses >= partner_code.max_uses:
-                raise HTTPException(status_code=400, detail="That access code has already been used up.")
-            code_ok = True
-        elif config.FREE_ACCESS_CODE and code == config.FREE_ACCESS_CODE:
-            code_ok, partner_code = True, None
-        else:
-            partner_code = None
-    if code and not code_ok and config.PAYMENTS_ENABLED:
-        # Say so, rather than silently sending them to checkout.
-        raise HTTPException(status_code=400, detail="That access code isn't valid.")
+    code_ok, partner_code = _check_access_code(db, code)
 
     # Email is the login identifier, so it must be unique. The exception is an
     # unpaid signup with the same email: someone who went to checkout and came
@@ -484,7 +489,14 @@ async def stripe_webhook(request: Request, background: BackgroundTasks,
     if event["type"] == "checkout.session.completed":
         session = event["data"]["object"]
         ref = session.get("client_reference_id")
-        if ref:
+        if ref and ref.startswith(payments.INVITE_REF_PREFIX):
+            inv = db.get(Invitation, ref[len(payments.INVITE_REF_PREFIX):])
+            if inv and inv.status != "active":
+                inv.status = "active"
+                inv.paid_at = now_utc()
+                inv.stripe_ref = session.get("id")
+                db.commit()
+        elif ref:
             ev = db.query(Event).filter(Event.id == ref).first()
             if ev and ev.status != "active":
                 _activate(ev)
@@ -898,6 +910,289 @@ def toggle_code(code: str, request: Request, db: Session = Depends(get_db)):
 @app.get("/admin")
 def admin_page():
     return FileResponse("static/admin.html")
+
+
+# ---------------------------------------------------------------------------
+# WED-36: animated invitation + RSVP
+# ---------------------------------------------------------------------------
+# One invitation per couple, edited from their gallery account. Guests open
+# /i/<slug>: the envelope video plays, the names appear on the card, then the
+# details and the RSVP form slide up. The couple can preview it any time; the
+# guest link only works once it's published (paid, or unlocked with a code).
+
+INVITE_THEMES = {"envelope"}
+MAX_RSVPS = 1000
+_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+_TIME_RE = re.compile(r"^\d{2}:\d{2}$")
+
+
+def _get_invitation(db: Session, ev: Event) -> Invitation | None:
+    return db.get(Invitation, ev.id)
+
+
+def _invitation_json(ev: Event, inv: Invitation | None) -> dict:
+    """The invitation's fields; defaults (names from the account) when there's none yet."""
+    return {
+        "names": (inv.names if inv and inv.names else ev.couple_names) or "",
+        "date": inv.date if inv else "",
+        "time": inv.time if inv else "",
+        "venue": inv.venue if inv else "",
+        "address": inv.address if inv else "",
+        "map_url": inv.map_url if inv else "",
+        "message": inv.message if inv else "",
+        "rsvp_by": inv.rsvp_by if inv else "",
+        "theme": inv.theme if inv else "envelope",
+        "status": inv.status if inv else "draft",
+    }
+
+
+class InvitationRequest(BaseModel):
+    names: str
+    date: str = ""
+    time: str = ""
+    venue: str = ""
+    address: str = ""
+    map_url: str = ""
+    message: str = ""
+    rsvp_by: str = ""
+    theme: str = "envelope"
+
+    @field_validator("names")
+    @classmethod
+    def v_names(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("Add your names.")
+        return v[:120]
+
+    @field_validator("date", "rsvp_by")
+    @classmethod
+    def v_date(cls, v: str) -> str:
+        v = v.strip()
+        if v and not _DATE_RE.match(v):
+            raise ValueError("Use a date like 2027-06-12.")
+        return v
+
+    @field_validator("time")
+    @classmethod
+    def v_time(cls, v: str) -> str:
+        v = v.strip()
+        if v and not _TIME_RE.match(v):
+            raise ValueError("Use a time like 18:30.")
+        return v
+
+    @field_validator("map_url")
+    @classmethod
+    def v_map(cls, v: str) -> str:
+        v = v.strip()
+        if v and not v.startswith(("https://", "http://")):
+            raise ValueError("The map link should start with https://")
+        return v[:500]
+
+    @field_validator("venue")
+    @classmethod
+    def v_venue(cls, v: str) -> str:
+        return v.strip()[:120]
+
+    @field_validator("address")
+    @classmethod
+    def v_address(cls, v: str) -> str:
+        return v.strip()[:200]
+
+    @field_validator("message")
+    @classmethod
+    def v_message(cls, v: str) -> str:
+        return v.strip()[:600]
+
+    @field_validator("theme")
+    @classmethod
+    def v_theme(cls, v: str) -> str:
+        return v if v in INVITE_THEMES else "envelope"
+
+
+@app.get("/e/{slug}/invite")
+def invitation_editor_page(slug: str):
+    return FileResponse("static/invite-edit.html")
+
+
+_INVITE_HTML = Path("static/invite.html")
+
+
+@app.get("/i/{slug}")
+def invitation_guest_page(slug: str, db: Session = Depends(get_db)):
+    """The guest page, with the couple's names in the link preview (WhatsApp, iMessage)."""
+    from html import escape
+    ev = db.query(Event).filter(Event.slug == slug).first()
+    inv = _get_invitation(db, ev) if ev else None
+    if inv and inv.status == "active":
+        title = f"{inv.names or ev.couple_names} · You're invited"
+        desc = "Tap to open your invitation and reply."
+    else:
+        title, desc = "You're invited", "A wedding invitation made with Confetti."
+    page = (_INVITE_HTML.read_text(encoding="utf-8")
+            .replace("__OG_TITLE__", escape(title))
+            .replace("__OG_DESC__", escape(desc))
+            .replace("__OG_IMAGE__", escape(f"{config.PUBLIC_BASE_URL}/static/invite/envelope-start.jpg")))
+    return Response(page, media_type="text/html")
+
+
+@app.get("/api/e/{slug}/invitation")
+def get_invitation(slug: str, request: Request, db: Session = Depends(get_db)):
+    require_event_auth(request, slug)
+    ev = get_event_or_404(db, slug)
+    data = _invitation_json(ev, _get_invitation(db, ev))
+    data["guest_url"] = f"{config.PUBLIC_BASE_URL}/i/{ev.slug}"
+    data["price_ready"] = bool(config.STRIPE_INVITE_LINK_URL) or not config.PAYMENTS_ENABLED
+    return data
+
+
+@app.put("/api/e/{slug}/invitation")
+def save_invitation(slug: str, body: InvitationRequest, request: Request, db: Session = Depends(get_db)):
+    require_event_auth(request, slug)
+    ev = get_event_or_404(db, slug)
+    inv = _get_invitation(db, ev)
+    if not inv:
+        inv = Invitation(event_id=ev.id)
+        db.add(inv)
+    for field, value in body.model_dump().items():
+        setattr(inv, field, value)
+    inv.updated_at = now_utc()
+    db.commit()
+    return _invitation_json(ev, inv)
+
+
+class PublishRequest(BaseModel):
+    access_code: str | None = None
+
+
+@app.post("/api/e/{slug}/invitation/publish")
+def publish_invitation(slug: str, body: PublishRequest, request: Request, db: Session = Depends(get_db)):
+    """Make the guest link live: free with a valid code (or in stub mode),
+    otherwise send the couple to the invitation's Stripe Payment Link."""
+    require_event_auth(request, slug)
+    ev = get_event_or_404(db, slug)
+    inv = _get_invitation(db, ev)
+    if not inv:
+        raise HTTPException(status_code=400, detail="Save your invitation first.")
+    if inv.status == "active":
+        return {"status": "active"}
+    code_ok, partner_code = _check_access_code(db, (body.access_code or "").strip())
+    if code_ok or not config.PAYMENTS_ENABLED:
+        inv.status = "active"
+        inv.paid_at = now_utc()
+        if code_ok:
+            inv.access_code = partner_code.code if partner_code else "FREE_ACCESS_CODE"
+            if partner_code:
+                partner_code.uses += 1
+        db.commit()
+        return {"status": "active"}
+    if not config.STRIPE_INVITE_LINK_URL:
+        raise HTTPException(status_code=503, detail="Invitation payments open soon. Use an access code for now.")
+    return {"status": "draft", "payment_url": payments.invite_payment_url(ev)}
+
+
+@app.get("/api/i/{slug}")
+def public_invitation(slug: str, request: Request, db: Session = Depends(get_db)):
+    """What a guest sees. The couple can see it before it's published (preview)."""
+    ev = db.query(Event).filter(Event.slug == slug).first()
+    inv = _get_invitation(db, ev) if ev else None
+    is_couple = bool(ev) and slug in request.session.get("auth_events", [])
+    if not inv or (inv.status != "active" and not is_couple):
+        raise HTTPException(status_code=404, detail="Invitation not found")
+    data = _invitation_json(ev, inv)
+    data["preview"] = inv.status != "active"
+    data["upload_url"] = f"/e/{ev.slug}" if ev.status == "active" else None
+    return data
+
+
+class RsvpRequest(BaseModel):
+    name: str
+    attending: bool
+    guests: int = 1
+    note: str = ""
+
+    @field_validator("name")
+    @classmethod
+    def v_name(cls, v: str) -> str:
+        v = " ".join(v.split())
+        if not v:
+            raise ValueError("Add your name.")
+        return v[:120]
+
+    @field_validator("guests")
+    @classmethod
+    def v_guests(cls, v: int) -> int:
+        if v < 1 or v > 20:
+            raise ValueError("Number of people should be between 1 and 20.")
+        return v
+
+    @field_validator("note")
+    @classmethod
+    def v_note(cls, v: str) -> str:
+        return v.strip()[:600]
+
+
+@app.post("/api/i/{slug}/rsvp")
+def submit_rsvp(slug: str, body: RsvpRequest, db: Session = Depends(get_db)):
+    ev = db.query(Event).filter(Event.slug == slug).first()
+    inv = _get_invitation(db, ev) if ev else None
+    if not inv or inv.status != "active":
+        raise HTTPException(status_code=404, detail="Invitation not found")
+    # Same name again = a changed answer, not a second guest.
+    existing = (db.query(Rsvp).filter(Rsvp.event_id == ev.id, func.lower(Rsvp.name) == body.name.lower())
+                .first())
+    if existing:
+        rsvp = existing
+    else:
+        if db.query(func.count(Rsvp.id)).filter(Rsvp.event_id == ev.id).scalar() >= MAX_RSVPS:
+            raise HTTPException(status_code=429, detail="This invitation can't take more replies.")
+        rsvp = Rsvp(event_id=ev.id, name=body.name)
+        db.add(rsvp)
+    rsvp.attending = body.attending
+    rsvp.guests = body.guests if body.attending else 0
+    rsvp.note = body.note
+    rsvp.updated_at = now_utc()
+    db.commit()
+    return {"ok": True, "updated": existing is not None}
+
+
+def _rsvp_rows(db: Session, ev: Event) -> list[Rsvp]:
+    return db.query(Rsvp).filter(Rsvp.event_id == ev.id).order_by(Rsvp.updated_at.desc()).all()
+
+
+@app.get("/api/e/{slug}/rsvps")
+def list_rsvps(slug: str, request: Request, db: Session = Depends(get_db)):
+    require_event_auth(request, slug)
+    ev = get_event_or_404(db, slug)
+    rows = _rsvp_rows(db, ev)
+    yes = [r for r in rows if r.attending]
+    return {
+        "totals": {"replies": len(rows), "yes": len(yes), "no": len(rows) - len(yes),
+                   "people": sum(r.guests for r in yes)},
+        "rsvps": [{"id": r.id, "name": r.name, "attending": r.attending, "guests": r.guests,
+                   "note": r.note, "at": r.updated_at.isoformat()} for r in rows],
+    }
+
+
+def _csv_safe(v) -> str:
+    """Stop spreadsheet apps treating a guest's text as a formula."""
+    v = str(v)
+    return "'" + v if v[:1] in ("=", "+", "-", "@", "\t", "\r") else v
+
+
+@app.get("/api/e/{slug}/rsvps.csv")
+def export_rsvps(slug: str, request: Request, db: Session = Depends(get_db)):
+    require_event_auth(request, slug)
+    ev = get_event_or_404(db, slug)
+    import csv
+    buf = io.StringIO()
+    w = csv.writer(buf)
+    w.writerow(["Name", "Coming", "People", "Note", "Replied"])
+    for r in _rsvp_rows(db, ev):
+        w.writerow([_csv_safe(r.name), "Yes" if r.attending else "No", r.guests,
+                    _csv_safe(r.note), r.updated_at.strftime("%Y-%m-%d %H:%M")])
+    return Response(buf.getvalue(), media_type="text/csv",
+                    headers={"Content-Disposition": 'attachment; filename="rsvps.csv"'})
 
 
 # ---------------------------------------------------------------------------

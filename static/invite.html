@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>__OG_TITLE__</title>
+  <meta property="og:title" content="__OG_TITLE__" />
+  <meta property="og:description" content="__OG_DESC__" />
+  <meta property="og:image" content="__OG_IMAGE__" />
+  <meta property="og:type" content="website" />
+  <meta name="theme-color" content="#0E2A20" />
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Pinyon+Script&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/app.css" />
+  <link rel="preload" as="image" href="/static/invite/envelope-start.jpg" />
+  <style>
+    html, body { height: 100%; }
+    body { background: #0B2219; color: #F6EFE4; overflow: hidden; }
+
+    /* Blurred velvet behind the 9:16 stage, so any screen shape looks full. */
+    .backdrop { position: fixed; inset: 0; background: radial-gradient(ellipse at 50% 40%, #17402F 0%, #0B2219 55%, #06150F 100%); }
+
+    /* The stage is the video's exact shape, so everything on the card is a plain percentage. */
+    .stage { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%);
+      width: min(100vw, 56.25dvh); height: min(177.78vw, 100dvh); container-type: size; overflow: hidden; }
+    @supports not (height: 1dvh) { .stage { width: min(100vw, 56.25vh); height: min(177.78vw, 100vh); } }
+    .stage video, .stage .still { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+    .still { opacity: 0; transition: opacity .4s; }
+    .still.show { opacity: 1; }
+
+    /* Tap to open */
+    .gate { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: flex-end;
+      padding-bottom: 13cqh; background: linear-gradient(180deg, rgba(5,20,14,0) 50%, rgba(5,20,14,.65) 100%);
+      transition: opacity .6s; cursor: pointer; border: 0; color: inherit; font: inherit; width: 100%; }
+    .gate.gone { opacity: 0; pointer-events: none; }
+    .gate small { font-size: 3.4cqw; letter-spacing: .32em; text-transform: uppercase; opacity: .85; }
+    .gate strong { font-family: "Pinyon Script", cursive; font-weight: 400; font-size: 11cqw; line-height: 1.25; margin: 1cqw 0 5cqw;
+      text-shadow: 0 2px 18px rgba(0,0,0,.5); text-align: center; padding: 0 6cqw; }
+    .gate .pill { display: inline-flex; align-items: center; gap: .6em; padding: 3.4cqw 7cqw; border-radius: 999px;
+      background: rgba(246,239,228,.14); border: 1px solid rgba(246,239,228,.45); backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px); font-size: 4cqw; letter-spacing: .08em; animation: breathe 2.4s ease-in-out infinite; }
+    @keyframes breathe { 50% { transform: scale(1.04); background: rgba(246,239,228,.22); } }
+
+    /* Text written onto the blank card in the last frame (card: 14.2-89.2% x, 31.7-63.1% y). */
+    .card-text { position: absolute; left: 14.2%; width: 75%; top: 31.7%; height: 31.4%;
+      display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;
+      padding: 0 7cqw; color: #2E2620; pointer-events: none; }
+    .card-text > * { opacity: 0; transform: translateY(6px); transition: opacity 1s ease, transform 1s ease; }
+    .card-text.show > * { opacity: 1; transform: none; }
+    .card-text.show > :nth-child(2) { transition-delay: .35s; }
+    .card-text.show > :nth-child(3) { transition-delay: .9s; }
+    .card-text.show > :nth-child(4) { transition-delay: 1.2s; }
+    .card-text.show > :nth-child(5) { transition-delay: 1.5s; }
+    .ct-top { font-size: 2.2cqw; letter-spacing: .28em; text-transform: uppercase; color: #8A6D3B; }
+    .ct-names { font-family: "Pinyon Script", cursive; font-size: 9cqw; line-height: 1.15; margin: 1.6cqw 0 .6cqw; white-space: nowrap; }
+    .ct-line { font-family: "Cormorant Garamond", Georgia, serif; font-style: italic; font-size: 3cqw; color: #5C514A; }
+    .ct-date { font-size: 2.4cqw; letter-spacing: .22em; text-transform: uppercase; margin-top: 2.2cqw; color: #2E2620; font-weight: 500; }
+    .ct-venue { font-family: "Cormorant Garamond", Georgia, serif; font-size: 3.6cqw; font-weight: 600; margin-top: .8cqw; }
+
+    /* Below the card: message + actions */
+    .below { position: absolute; left: 8%; right: 8%; top: 67%; bottom: 3%; display: flex; flex-direction: column;
+      align-items: center; text-align: center; gap: 2.6cqw; opacity: 0; transform: translateY(10px);
+      transition: opacity .8s ease, transform .8s ease; pointer-events: none; }
+    .below.show { opacity: 1; transform: none; pointer-events: auto; }
+    .below .msg { font-family: "Cormorant Garamond", Georgia, serif; font-style: italic; font-size: 4.3cqw; line-height: 1.35;
+      text-shadow: 0 1px 10px rgba(0,0,0,.6); max-height: 17cqh; overflow: hidden; }
+    .below .by { font-size: 3cqw; letter-spacing: .18em; text-transform: uppercase; opacity: .85; }
+    .gold { background: linear-gradient(180deg, #F3D9A0, #D9AE5C); color: #2B2014; border: 0; border-radius: 999px;
+      padding: 3.6cqw 10cqw; font-size: 4.2cqw; font-weight: 600; letter-spacing: .04em; cursor: pointer;
+      box-shadow: 0 8px 26px rgba(0,0,0,.35); }
+    .row { display: flex; gap: 2.4cqw; flex-wrap: wrap; justify-content: center; }
+    .ghost { background: rgba(246,239,228,.12); color: #F6EFE4; border: 1px solid rgba(246,239,228,.4); border-radius: 999px;
+      padding: 2.4cqw 5cqw; font-size: 3.4cqw; text-decoration: none; cursor: pointer; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+
+    .replay { position: absolute; top: 3cqw; right: 3cqw; z-index: 3; font-size: 3.2cqw; padding: 1.8cqw 3.6cqw; }
+    .preview-bar { position: fixed; top: 0; left: 0; right: 0; z-index: 50; background: #F4EBE2; color: #2B2420;
+      font-size: .85rem; text-align: center; padding: .55rem 1rem; }
+    .preview-bar a { color: #9E4F45; font-weight: 600; }
+
+    /* RSVP sheet */
+    .sheet-back { position: fixed; inset: 0; z-index: 40; background: rgba(5,15,10,.55); opacity: 0; pointer-events: none; transition: opacity .25s; }
+    .sheet-back.open { opacity: 1; pointer-events: auto; }
+    .sheet { position: fixed; left: 50%; bottom: 0; z-index: 41; width: min(100%, 480px); max-height: 92dvh; overflow-y: auto;
+      transform: translate(-50%, 105%); transition: transform .35s cubic-bezier(.2,.8,.2,1);
+      background: #FBF7F2; color: var(--ink); border-radius: 24px 24px 0 0; padding: 1.5rem 1.4rem calc(1.5rem + env(safe-area-inset-bottom)); }
+    .sheet.open { transform: translate(-50%, 0); }
+    .sheet h2 { font-family: var(--serif); font-size: 2rem; font-weight: 600; text-align: center; line-height: 1.1; }
+    .sheet .sub { text-align: center; color: var(--muted); font-size: .9rem; margin: .3rem 0 1.25rem; }
+    .details { background: #fff; border: 1px solid var(--line); border-radius: var(--radius); padding: .9rem 1rem; margin-bottom: 1.25rem; font-size: .92rem; color: var(--ink-soft); }
+    .details div + div { margin-top: .35rem; }
+    .details b { color: var(--ink); }
+    .choice { display: grid; grid-template-columns: 1fr 1fr; gap: .6rem; margin-bottom: 1.1rem; }
+    .choice button { padding: .95rem .5rem; border-radius: 14px; border: 1.5px solid var(--line); background: #fff; font-weight: 600; color: var(--ink); cursor: pointer; }
+    .choice button[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+    .stepper { display: flex; align-items: center; gap: .75rem; }
+    .stepper button { width: 42px; height: 42px; border-radius: 50%; border: 1.5px solid var(--line); background: #fff; font-size: 1.3rem; cursor: pointer; color: var(--ink); }
+    .stepper output { min-width: 2ch; text-align: center; font-size: 1.2rem; font-weight: 600; }
+    textarea.input { resize: vertical; min-height: 80px; }
+    .close-x { position: absolute; top: .8rem; right: .9rem; background: none; border: 0; font-size: 1.5rem; color: var(--muted); cursor: pointer; }
+    .thanks { text-align: center; padding: 1rem 0 .5rem; }
+    .thanks .big { font-size: 2.6rem; }
+
+    .missing { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; text-align: center; padding: 2rem; }
+    .missing h1 { font-family: var(--serif); font-size: 2rem; margin-bottom: .5rem; }
+  </style>
+</head>
+<body>
+<div class="backdrop"></div>
+
+<div class="stage" id="stage" hidden>
+  <video id="vid" muted playsinline preload="auto" poster="/static/invite/envelope-start.jpg">
+    <source src="/static/invite/envelope.webm" type="video/webm" />
+    <source src="/static/invite/envelope.mp4" type="video/mp4" />
+  </video>
+  <img class="still" id="still" src="/static/invite/envelope-end.jpg" alt="" />
+
+  <div class="card-text" id="cardText" aria-live="polite">
+    <div class="ct-top">Together with their families</div>
+    <div class="ct-names" id="ctNames"></div>
+    <div class="ct-line">request the pleasure of your company</div>
+    <div class="ct-date" id="ctDate"></div>
+    <div class="ct-venue" id="ctVenue"></div>
+  </div>
+
+  <div class="below" id="below">
+    <div class="msg" id="msg"></div>
+    <button class="gold" id="rsvpBtn" type="button">RSVP</button>
+    <div class="by" id="by"></div>
+    <div class="row">
+      <a class="ghost" id="mapBtn" target="_blank" rel="noopener" hidden>Map</a>
+      <a class="ghost" id="photosBtn" hidden>Share your photos</a>
+    </div>
+  </div>
+
+  <button class="ghost replay" id="replay" type="button" hidden>↺ Replay</button>
+
+  <button class="gate" id="gate" type="button" aria-label="Open the invitation">
+    <small>You're invited</small>
+    <strong id="gateNames"></strong>
+    <span class="pill">Tap to open</span>
+  </button>
+</div>
+
+<div class="preview-bar" id="previewBar" hidden>Preview: only you can see this. <a id="previewLink" href="#">Publish it</a> to share with guests.</div>
+
+<div class="sheet-back" id="sheetBack"></div>
+<div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
+  <button class="close-x" id="sheetClose" type="button" aria-label="Close">×</button>
+  <div id="formView">
+    <h2 id="sheetTitle">Will you join us?</h2>
+    <p class="sub" id="sheetSub"></p>
+    <div class="details" id="details"></div>
+    <form id="rsvpForm" novalidate>
+      <div class="field">
+        <label class="label" for="gName">Your name</label>
+        <input class="input" id="gName" autocomplete="name" maxlength="120" placeholder="First and last name" />
+      </div>
+      <div class="choice" role="group" aria-label="Will you attend?">
+        <button type="button" id="yesBtn" aria-pressed="false">Joyfully accept</button>
+        <button type="button" id="noBtn" aria-pressed="false">Regretfully decline</button>
+      </div>
+      <div class="field" id="peopleField" hidden>
+        <span class="label">How many of you, including you?</span>
+        <div class="stepper"><button type="button" id="minus" aria-label="Fewer">−</button><output id="people">1</output><button type="button" id="plus" aria-label="More">+</button></div>
+      </div>
+      <div class="field">
+        <label class="label" for="gNote">Dietary needs or a message <span style="font-weight:400;color:var(--muted)">(optional)</span></label>
+        <textarea class="input" id="gNote" maxlength="600"></textarea>
+      </div>
+      <button class="btn btn-block btn-lg" type="submit" id="sendBtn">Send reply</button>
+      <div class="alert alert-error" id="err"></div>
+    </form>
+  </div>
+  <div id="thanksView" class="thanks" hidden>
+    <div class="big">💌</div>
+    <h2 id="thanksTitle"></h2>
+    <p class="sub" id="thanksSub"></p>
+    <button class="btn btn-ghost" type="button" id="thanksClose">Back to the invitation</button>
+  </div>
+</div>
+
+<div class="missing" id="missing" hidden>
+  <div><h1>Invitation not found</h1><p>Check the link you were sent, or ask the couple for a new one.</p></div>
+</div>
+
+<script src="/static/confetti.js"></script>
+<script>
+"use strict";
+(async function () {
+  const $ = (id) => document.getElementById(id);
+  const slug = location.pathname.split("/")[2];
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const CARD_AT = 7.6;  // seconds: the card has settled in the video by now
+
+  let inv;
+  try {
+    const r = await fetch(`/api/i/${encodeURIComponent(slug)}`);
+    if (!r.ok) throw 0;
+    inv = await r.json();
+  } catch { $("missing").hidden = false; return; }
+
+  const fmtDate = (d) => d ? new Date(d + "T12:00:00").toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" }) : "";
+  const dateLine = [fmtDate(inv.date), inv.time].filter(Boolean).join(" · ");
+
+  document.title = `${inv.names} · You're invited`;
+  $("gateNames").textContent = inv.names;
+  $("ctNames").textContent = inv.names;
+  $("ctDate").textContent = dateLine;
+  $("ctVenue").textContent = inv.venue;
+  $("msg").textContent = inv.message;
+  $("by").textContent = inv.rsvp_by ? "Kindly reply by " + new Date(inv.rsvp_by + "T12:00:00").toLocaleDateString("en-GB", { day: "numeric", month: "long" }) : "";
+  if (inv.map_url) { $("mapBtn").href = inv.map_url; $("mapBtn").hidden = false; }
+  const weddingDay = inv.date ? new Date(inv.date + "T00:00:00") : null;
+  if (inv.upload_url && weddingDay && Date.now() >= weddingDay.getTime()) {
+    $("photosBtn").href = inv.upload_url; $("photosBtn").hidden = false;
+    $("rsvpBtn").hidden = true;  // after the day, photos matter more than replies
+  }
+  if (inv.preview) { $("previewBar").hidden = false; $("previewLink").href = `/e/${slug}/invite`; }
+  $("stage").hidden = false;
+
+  // Long names: shrink until they fit on the card.
+  function fitNames() {
+    const el = $("ctNames"), box = $("cardText");
+    el.style.fontSize = "";
+    let size = parseFloat(getComputedStyle(el).fontSize);
+    const max = box.clientWidth * 0.86;
+    while (el.scrollWidth > max && size > 10) { size -= 1; el.style.fontSize = size + "px"; }
+  }
+
+  const vid = $("vid");
+  let revealed = false;
+  function revealCard() {
+    if (revealed) return;
+    revealed = true;
+    fitNames();
+    $("cardText").classList.add("show");
+    setTimeout(() => { $("below").classList.add("show"); $("replay").hidden = false; }, reduce ? 0 : 1900);
+  }
+  function showEnd() { $("still").classList.add("show"); revealCard(); }
+
+  vid.addEventListener("timeupdate", () => { if (vid.currentTime >= CARD_AT) revealCard(); });
+  vid.addEventListener("ended", showEnd);
+  vid.addEventListener("error", showEnd, true);
+
+  $("gate").addEventListener("click", () => {
+    $("gate").classList.add("gone");
+    if (reduce) return showEnd();
+    const p = vid.play();
+    if (p && p.catch) p.catch(showEnd);
+    // If the video never starts (data saver, old phone), still show the card.
+    setTimeout(() => { if (vid.currentTime < 0.1) showEnd(); }, 4000);
+  });
+
+  $("replay").addEventListener("click", () => {
+    revealed = false;
+    $("cardText").classList.remove("show"); $("below").classList.remove("show");
+    $("still").classList.remove("show"); $("replay").hidden = true;
+    vid.currentTime = 0; vid.play().catch(showEnd);
+  });
+  addEventListener("resize", () => { if (revealed) fitNames(); });
+
+  // ── RSVP ───────────────────────────────────────────────────────────
+  const det = [];
+  if (dateLine) det.push(`<div><b>When:</b> ${esc(dateLine)}</div>`);
+  if (inv.venue || inv.address) det.push(`<div><b>Where:</b> ${esc([inv.venue, inv.address].filter(Boolean).join(", "))}${inv.map_url ? ` · <a href="${esc(inv.map_url)}" target="_blank" rel="noopener">Map</a>` : ""}</div>`);
+  $("details").innerHTML = det.join("");
+  $("details").hidden = !det.length;
+  $("sheetSub").textContent = $("by").textContent;
+  function esc(s) { return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
+
+  let attending = null, people = 1;
+  function setAttending(v) {
+    attending = v;
+    $("yesBtn").setAttribute("aria-pressed", String(v === true));
+    $("noBtn").setAttribute("aria-pressed", String(v === false));
+    $("peopleField").hidden = v !== true;
+  }
+  $("yesBtn").onclick = () => setAttending(true);
+  $("noBtn").onclick = () => setAttending(false);
+  $("minus").onclick = () => { people = Math.max(1, people - 1); $("people").textContent = people; };
+  $("plus").onclick = () => { people = Math.min(20, people + 1); $("people").textContent = people; };
+
+  function openSheet() {
+    $("formView").hidden = false; $("thanksView").hidden = true;
+    $("sheet").classList.add("open"); $("sheetBack").classList.add("open");
+    setTimeout(() => $("gName").focus(), 350);
+  }
+  function closeSheet() { $("sheet").classList.remove("open"); $("sheetBack").classList.remove("open"); }
+  $("rsvpBtn").onclick = openSheet;
+  $("sheetClose").onclick = closeSheet;
+  $("sheetBack").onclick = closeSheet;
+  $("thanksClose").onclick = closeSheet;
+  addEventListener("keydown", (e) => { if (e.key === "Escape") closeSheet(); });
+
+  $("rsvpForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const err = $("err");
+    err.classList.remove("show");
+    const name = $("gName").value.trim();
+    if (!name) { err.textContent = "Please add your name."; err.classList.add("show"); return; }
+    if (attending === null) { err.textContent = "Please choose accept or decline."; err.classList.add("show"); return; }
+    const first = name.split(" ")[0];
+    const thanks = () => {
+      $("thanksTitle").textContent = attending ? `See you there, ${first}!` : `Thank you, ${first}`;
+      $("thanksSub").textContent = (attending ? "Your reply has been sent to " + inv.names + "." : "We'll miss you. Your reply has been sent.")
+        + (inv.preview ? " (Preview: replies are not saved yet.)" : "");
+      $("formView").hidden = true; $("thanksView").hidden = false;
+      if (attending && window.confettiBurst) confettiBurst(90);
+    };
+    if (inv.preview) return thanks();
+    $("sendBtn").disabled = true;
+    try {
+      const r = await fetch(`/api/i/${encodeURIComponent(slug)}/rsvp`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, attending, guests: people, note: $("gNote").value }),
+      });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(Array.isArray(data.detail) ? data.detail[0].msg.replace(/^Value error, /, "") : data.detail);
+      thanks();
+    } catch (ex) {
+      err.textContent = ex.message || "Couldn't send your reply. Please try again.";
+      err.classList.add("show");
+    } finally { $("sendBtn").disabled = false; }
+  });
+})();
+</script>
+</body>
+</html>

@@ -77,6 +77,42 @@ class AccessCode(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
 
 
+class Invitation(Base):
+    """WED-36: one animated invitation per couple. Guests open /i/<slug>."""
+    __tablename__ = "invitations"
+
+    event_id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    names: Mapped[str] = mapped_column(String(120), default="")
+    date: Mapped[str] = mapped_column(String(10), default="")       # YYYY-MM-DD
+    time: Mapped[str] = mapped_column(String(5), default="")        # HH:MM
+    venue: Mapped[str] = mapped_column(String(120), default="")
+    address: Mapped[str] = mapped_column(String(200), default="")
+    map_url: Mapped[str] = mapped_column(String(500), default="")
+    message: Mapped[str] = mapped_column(String(600), default="")
+    rsvp_by: Mapped[str] = mapped_column(String(10), default="")    # YYYY-MM-DD
+    theme: Mapped[str] = mapped_column(String(20), default="envelope")
+    status: Mapped[str] = mapped_column(String(20), default="draft")  # draft | active
+    access_code: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    stripe_ref: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    paid_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
+
+
+class Rsvp(Base):
+    """A guest's reply to an invitation. One per guest name (a new reply updates it)."""
+    __tablename__ = "rsvps"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    event_id: Mapped[str] = mapped_column(String(36), index=True)
+    name: Mapped[str] = mapped_column(String(120))
+    attending: Mapped[bool] = mapped_column(Boolean)
+    guests: Mapped[int] = mapped_column(Integer, default=1)          # people incl. the guest
+    note: Mapped[str] = mapped_column(String(600), default="")       # dietary needs / message
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
+
+
 class PasswordReset(Base):
     """One-time password reset link. Only a hash of the token is stored, so a
     database leak can't be used to reset anyone's password."""

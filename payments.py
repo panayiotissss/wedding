@@ -27,6 +27,19 @@ def payment_url(event) -> str:
     return url
 
 
+INVITE_REF_PREFIX = "inv_"
+
+
+def invite_payment_url(event) -> str:
+    """Payment Link for the invitation; the reference tells the webhook which product."""
+    base = config.STRIPE_INVITE_LINK_URL or ""
+    sep = "&" if "?" in base else "?"
+    url = f"{base}{sep}client_reference_id={INVITE_REF_PREFIX}{event.id}"
+    if event.contact_email:
+        url += f"&prefilled_email={quote(event.contact_email)}"
+    return url
+
+
 def verify_webhook(payload: bytes, sig_header: str | None):
     """Verify the Stripe signature and return the parsed event, or raise."""
     import stripe  # imported lazily so the app runs without the lib in stub mode

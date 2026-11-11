@@ -483,3 +483,97 @@ def test_bad_or_duplicate_codes_are_refused(client):
     assert client.post("/api/admin/codes", json={"code": "a b", "partner": "x"}, headers=ADMIN).status_code == 422
     client.post("/api/admin/codes", json={"code": "DUPE1", "partner": "x"}, headers=ADMIN)
     assert client.post("/api/admin/codes", json={"code": "dupe1", "partner": "x"}, headers=ADMIN).status_code == 409
+
+
+# ── WED-36: invitation + RSVP ───────────────────────────────────────────────
+
+_INVITE = {"names": "Sofia & Daniel", "date": "2027-06-12", "time": "18:30", "venue": "Agios Georgios",
+           "address": "Paphos", "map_url": "https://maps.example/x", "message": "Join us",
+           "rsvp_by": "2027-05-01"}
+
+
+def _gallery(signup):
+    return signup(access_code="FREE-TEST").json()["slug"]
+
+
+def test_invitation_draft_is_private_until_published(client, signup):
+    slug = _gallery(signup)
+    got = client.get(f"/api/e/{slug}/invitation").json()
+    assert got["names"] == "Sofia & Daniel" and got["status"] == "draft"
+    assert client.put(f"/api/e/{slug}/invitation", json=_INVITE).status_code == 200
+
+    # The couple sees a preview; a guest (no session) sees nothing yet.
+    assert client.get(f"/api/i/{slug}").json()["preview"] is True
+    client.cookies.clear()
+    assert client.get(f"/api/i/{slug}").status_code == 404
+    assert client.post(f"/api/i/{slug}/rsvp", json={"name": "Eleni", "attending": True}).status_code == 404
+    assert client.get(f"/api/e/{slug}/invitation").status_code == 401
+
+
+def test_invitation_validation(client, signup):
+    slug = _gallery(signup)
+    for bad in ({"names": " "}, {"date": "12/06/2027"}, {"time": "6pm"}, {"map_url": "javascript:alert(1)"}):
+        assert client.put(f"/api/e/{slug}/invitation", json={**_INVITE, **bad}).status_code == 422
+
+
+def test_publish_needs_payment_or_code(client, signup, monkeypatch):
+    slug = _gallery(signup)
+    assert client.post(f"/api/e/{slug}/invitation/publish", json={}).status_code == 400  # nothing saved
+    client.put(f"/api/e/{slug}/invitation", json=_INVITE)
+    # No invitation payment link yet: a clear message, still a draft.
+    assert client.post(f"/api/e/{slug}/invitation/publish", json={}).status_code == 503
+    assert client.post(f"/api/e/{slug}/invitation/publish", json={"access_code": "NOPE"}).status_code == 400
+
+    monkeypatch.setattr(config, "STRIPE_INVITE_LINK_URL", "https://buy.stripe.com/test_invite")
+    res = client.post(f"/api/e/{slug}/invitation/publish", json={}).json()
+    ev = _event(slug)
+    assert res["payment_url"].startswith("https://buy.stripe.com/test_invite")
+    assert f"client_reference_id=inv_{ev.id}" in res["payment_url"]
+
+    # Stripe confirms the invitation payment: it goes live, the gallery is untouched.
+    assert _stripe_webhook(client, _checkout_completed(f"inv_{ev.id}")).status_code == 200
+    assert client.get(f"/api/e/{slug}/invitation").json()["status"] == "active"
+    assert _event(slug).stripe_ref is None
+
+
+def test_publish_with_code_then_guests_rsvp(client, signup):
+    slug = _gallery(signup)
+    client.put(f"/api/e/{slug}/invitation", json=_INVITE)
+    assert client.post(f"/api/e/{slug}/invitation/publish", json={"access_code": "FREE-TEST"}).json()["status"] == "active"
+
+    couple_cookies = dict(client.cookies)
+    client.cookies.clear()
+    pub = client.get(f"/api/i/{slug}").json()
+    assert pub["preview"] is False and pub["venue"] == "Agios Georgios" and pub["upload_url"] == f"/e/{slug}"
+
+    assert client.post(f"/api/i/{slug}/rsvp", json={"name": "Eleni K", "attending": True, "guests": 2,
+                                                     "note": "Vegetarian"}).json() == {"ok": True, "updated": False}
+    assert client.post(f"/api/i/{slug}/rsvp", json={"name": "Marios", "attending": False}).status_code == 200
+    # Same name again changes the answer instead of adding a guest.
+    assert client.post(f"/api/i/{slug}/rsvp", json={"name": " eleni  k ", "attending": True, "guests": 3}).json()["updated"]
+    assert client.post(f"/api/i/{slug}/rsvp", json={"name": "Big", "attending": True, "guests": 50}).status_code == 422
+    assert client.post(f"/api/i/{slug}/rsvp", json={"name": "=HYPERLINK(1)", "attending": True}).status_code == 200
+
+    assert client.get(f"/api/e/{slug}/rsvps").status_code == 401
+    client.cookies.update(couple_cookies)
+    data = client.get(f"/api/e/{slug}/rsvps").json()
+    assert data["totals"] == {"replies": 3, "yes": 2, "no": 1, "people": 4}
+    csv = client.get(f"/api/e/{slug}/rsvps.csv")
+    assert csv.headers["content-type"].startswith("text/csv")
+    assert "Eleni K,Yes,3" in csv.text and "Marios,No,0" in csv.text and "'=HYPERLINK(1)" in csv.text
+
+
+def test_invitation_pages_load(client):
+    assert client.get("/e/abc/invite").status_code == 200
+    assert client.get("/i/abc").status_code == 200
+    assert client.get("/static/invite/envelope.mp4").status_code == 200
+
+
+def test_guest_page_link_preview_shows_names_only_when_live(client, signup):
+    slug = _gallery(signup)
+    client.put(f"/api/e/{slug}/invitation", json=_INVITE)
+    assert "Sofia &amp; Daniel" not in client.get(f"/i/{slug}").text
+    client.post(f"/api/e/{slug}/invitation/publish", json={"access_code": "FREE-TEST"})
+    page = client.get(f"/i/{slug}").text
+    assert '<meta property="og:title" content="Sofia &amp; Daniel · You&#x27;re invited" />' in page
+    assert "__OG_" not in page
