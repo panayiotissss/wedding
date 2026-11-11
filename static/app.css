@@ -31,7 +31,9 @@
 html { -webkit-text-size-adjust: 100%; }
 body {
   font-family: var(--sans);
-  background: var(--bg);
+  /* Forest green at the top, melting into ivory: same as the landing page. */
+  background: linear-gradient(180deg, var(--forest) 0, var(--forest) 210px, var(--bg) 520px) no-repeat, var(--bg);
+  background: linear-gradient(180deg in oklab, var(--forest) 0, var(--forest) 210px, var(--bg) 520px) no-repeat, var(--bg);
   color: var(--ink);
   min-height: 100vh;
   line-height: 1.5;
@@ -48,23 +50,28 @@ button { font: inherit; }
   display: flex; align-items: center; justify-content: space-between; gap: 1rem;
   max-width: 1080px; margin: 0 auto; padding: 1rem 1.25rem;
 }
-.topbar.sticky {
-  position: sticky; top: 0; z-index: 30; max-width: none;
-  background: rgba(243,237,228,.88); backdrop-filter: saturate(1.4) blur(10px);
-  -webkit-backdrop-filter: saturate(1.4) blur(10px);
-  border-bottom: 1px solid var(--line);
-}
+.topbar.sticky { position: sticky; top: 0; z-index: 30; }
 .brand {
   display: inline-flex; align-items: center; gap: .55rem;
   font-family: var(--serif); font-size: 1.7rem; font-weight: 400;
-  color: var(--ink); text-decoration: none; letter-spacing: .01em;
+  color: #F3EDE4; text-decoration: none; letter-spacing: .01em;
   min-width: 0;
 }
 .brand img { width: 28px; height: 28px; flex-shrink: 0; }
 .brand span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .nav { display: flex; align-items: center; gap: .5rem; }
-.nav-link { font-size: .9rem; color: var(--ink-soft); text-decoration: none; padding: .5rem .75rem; border-radius: 999px; }
-.nav-link:hover { background: var(--bg-deep); }
+.nav-link { font: inherit; font-size: .92rem; color: rgba(243,237,228,.8); text-decoration: none; padding: .5rem .75rem; border-radius: 10px;
+  background: none; border: 0; cursor: pointer; }
+.nav-link:hover { color: #F3EDE4; background: rgba(243,237,228,.08); }
+
+/* Text that sits on the green band at the top of a page. */
+.on-forest, .on-forest h1 { color: #F3EDE4; }
+.on-forest .hint, .on-forest .count, .on-forest p { color: rgba(243,237,228,.7); }
+.on-forest .kicker { color: var(--gold); }
+.on-forest .btn-ghost { color: #F3EDE4; border-color: rgba(243,237,228,.3); }
+.on-forest .btn-ghost:hover:not(:disabled) { background: rgba(243,237,228,.08); border-color: rgba(243,237,228,.5); }
+.on-forest .btn-danger { color: #F2B8AE; border-color: rgba(242,184,174,.4); }
+.on-forest .btn-danger:hover:not(:disabled) { background: rgba(242,184,174,.1); }
 
 /* ── Buttons ─────────────────────────────────────────────── */
 .btn {

@@ -122,12 +122,12 @@
 </head>
 <body>
 
-<header class="topbar sticky">
-  <a href="#" class="brand brand-full" id="brandLink" title="Back to top"><img src="/static/favicon.svg" alt="" /><span id="brand">Gallery</span></a>
-  <div class="header-actions" id="headerActions" style="display:none">
-    <a class="btn btn-ghost btn-sm" id="homeLink">Home</a>
-    <button class="btn btn-ghost btn-sm" id="logoutBtn">Log out</button>
-  </div>
+<header class="topbar">
+  <a href="/" class="brand"><img src="/static/favicon.svg" alt="" /><span>Confetti</span></a>
+  <nav class="nav header-actions" id="headerActions" style="display:none">
+    <a class="nav-link" id="homeLink">Home</a>
+    <button class="nav-link" type="button" id="logoutBtn">Log out</button>
+  </nav>
 </header>
 
 <!-- Login form -->
@@ -145,7 +145,7 @@
 
 <!-- Gallery (shown after login) -->
 <div id="galleryScreen">
-  <div class="gal-head">
+  <div class="gal-head on-forest">
     <div>
       <h1 id="galTitle">Your photos</h1>
       <div class="count" id="statsLabel">Loading…</div>
@@ -229,7 +229,7 @@
     try {
       const info = await (await fetch(`${API}/info`)).json();
       if (info && info.names) {
-        document.getElementById("brand").textContent = info.names;
+        document.getElementById("galTitle").textContent = info.names;
         document.getElementById("galTitle").textContent = info.names;
         document.title = `Gallery · ${info.names}`;
       }
@@ -256,10 +256,6 @@
   })();
 
   // The names in the header scroll back to the top instead of leaving the gallery.
-  document.getElementById("brandLink").addEventListener("click", e => {
-    e.preventDefault();
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  });
 
   // ── DOM refs ───────────────────────────────────────────────────────────
 
