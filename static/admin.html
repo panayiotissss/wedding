@@ -15,6 +15,13 @@
     h1 { font-family: var(--serif); font-size: 2.2rem; font-weight: 600; margin: .5rem 0 1rem; }
     .login { display: flex; flex-wrap: wrap; gap: .6rem; align-items: center; margin-bottom: 1.5rem; }
     .login .input { max-width: 360px; }
+    /* Before logging in: a centred card. */
+    body.locked h1 { display: none; }
+    body.locked main { min-height: calc(100vh - 140px); display: grid; place-items: center; }
+    body.locked .login { flex-direction: column; align-items: stretch; width: min(100%, 360px); margin: 0; background: var(--surface);
+      border: 1px solid var(--line); border-radius: var(--radius-lg); box-shadow: var(--shadow); padding: 2rem 1.5rem; text-align: center; }
+    body.locked .login::before { content: "Admin"; font-family: var(--serif); font-size: 2rem; font-weight: 600; }
+    body.locked .login .input { max-width: none; }
     .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: .75rem; margin-bottom: 1.5rem; }
     .tile { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: .9rem 1rem; }
     .tile b { display: block; font-size: 1.6rem; font-variant-numeric: tabular-nums; }
@@ -35,7 +42,7 @@
     .linkbtn { background: none; border: 0; color: var(--accent); font-weight: 600; cursor: pointer; padding: 0; font: inherit; }
   </style>
 </head>
-<body>
+<body class="locked">
 <header class="topbar">
   <a href="/" class="brand"><img src="/static/favicon.svg" alt="" /><span>Confetti</span></a>
 </header>
@@ -105,6 +112,7 @@ $("login").addEventListener("submit", async (e) => {
     <td>${day(g.last_upload)}</td><td>${day(g.last_download_at)}</td><td>${day(g.all_deleted_at)}</td>
     <td>${g.files_freed_at ? "Freed " + day(g.files_freed_at) : g.freeup_warned_at ? `<span class="warn">Warned ${day(g.freeup_warned_at)}</span>` : ""}</td>
     <td>${esc(g.access_code || "")}</td><td>${esc(g.referred_by || "")}</td><td>${esc(g.email || "")}</td></tr>`).join("");
+  document.body.classList.remove("locked");
   $("tiles").hidden = false; $("tablebox").hidden = false; $("codes").hidden = false;
   loadCodes();
 });

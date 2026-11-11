@@ -84,7 +84,7 @@ def _cleanup_once() -> list[str]:
         db.close()
 
 
-app = FastAPI(docs_url=None, redoc_url=None, lifespan=lifespan)
+app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan)
 
 app.add_middleware(
     SessionMiddleware,
@@ -211,7 +211,7 @@ _PUBLIC_PAGES = ["/", "/create", "/login", "/terms", "/privacy",
 @app.get("/robots.txt", include_in_schema=False)
 def robots_txt():
     base = config.PUBLIC_BASE_URL
-    body = ("User-agent: *\nAllow: /\nDisallow: /api/\nDisallow: /e/\nDisallow: /i/\nDisallow: /admin\n"
+    body = ("User-agent: *\nAllow: /\nDisallow: /api/\nDisallow: /e/\nDisallow: /i/\n"
             f"Sitemap: {base}/sitemap.xml\n")
     return Response(body, media_type="text/plain")
 
@@ -895,8 +895,8 @@ UNPAID_TTL = timedelta(days=30)
 
 
 def run_cleanup(db: Session) -> list[str]:
-    """Delete galleries past their 12-month expiry and sign-ups never paid
-    within 30 days, with all their R2 files and reset links. Both promises are
+    """Delete accounts past their 12-month expiry and sign-ups never paid
+    within 30 days, with all their R2 files, reset links, invitation and RSVPs. Both promises are
     in the Privacy Policy (static/privacy.html)."""
     now = now_utc()
     expired = db.query(Event).filter(Event.expires_at.isnot(None), Event.expires_at < now).all()
@@ -908,6 +908,8 @@ def run_cleanup(db: Session) -> list[str]:
     for ev in expired + unpaid:
         storage.delete_prefix(storage.event_root(_storage_key(ev)))
         db.query(PasswordReset).filter(PasswordReset.event_id == ev.id).delete()
+        db.query(Rsvp).filter(Rsvp.event_id == ev.id).delete()
+        db.query(Invitation).filter(Invitation.event_id == ev.id).delete()
         db.delete(ev)
         deleted.append(ev.slug)
     db.commit()
@@ -1044,8 +1046,10 @@ def toggle_code(code: str, request: Request, db: Session = Depends(get_db)):
     return {"ok": True, "active": c.active}
 
 
-@app.get("/admin")
+@app.get("/adminP", include_in_schema=False)
 def admin_page():
+    # Not linked anywhere and not listed in robots.txt; the data behind it still
+    # needs ADMIN_TOKEN, this just keeps the page itself out of casual reach.
     return FileResponse("static/admin.html")
 
 

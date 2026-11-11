@@ -445,7 +445,10 @@ def test_admin_report_needs_token_and_counts(client, signup, monkeypatch):
     rep = client.get("/api/admin/report", headers={"X-Admin-Token": "test-admin"}).json()
     assert rep["totals"]["galleries"] == 2 and rep["totals"]["from_guests"] == 1
     assert rep["totals"]["photos"] == 2 and rep["totals"]["bytes"] == 2000
-    assert client.get("/admin").status_code == 200
+    assert client.get("/adminP").status_code == 200
+    assert client.get("/admin").status_code == 404
+    assert "admin" not in client.get("/robots.txt").text.lower()
+    assert client.get("/openapi.json").status_code == 404  # no public map of the API
 
 
 # ── WED-24: partner access codes ───────────────────────────────────────────
@@ -677,3 +680,17 @@ def test_agent_and_search_files(client):
     assert "<loc>http://testserver/create</loc>" in client.get("/sitemap.xml").text
     llms = client.get("/llms.txt").text
     assert "EUR 20" in llms and "/create?plan=bundle" in llms
+
+
+def test_cleanup_also_removes_the_invitation_and_rsvps(client, signup, monkeypatch):
+    from db import Invitation, Rsvp
+    slug = _account(signup, "invite")["slug"]
+    client.put(f"/api/e/{slug}/invitation", json=_INVITE)
+    client.post(f"/api/i/{slug}/rsvp", json={"name": "Eleni", "attending": True})
+    monkeypatch.setattr(storage, "delete_prefix", lambda prefix: 0)
+    with SessionLocal() as db:
+        ev = db.query(Event).filter(Event.slug == slug).first()
+        ev.expires_at = datetime(2000, 1, 1, tzinfo=timezone.utc)
+        db.commit()
+        assert main.run_cleanup(db) == [slug]
+        assert db.query(Invitation).count() == 0 and db.query(Rsvp).count() == 0
