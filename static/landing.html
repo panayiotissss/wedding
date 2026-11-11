@@ -2,11 +2,11 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Confetti · Wedding website invitations and guest photos</title>
-  <meta name="description" content="A wedding website invitation your guests scroll, with RSVP. One QR code that collects every guest's photos. Five designs, from €20, pay once." />
-  <meta property="og:title" content="Confetti · Wedding website invitations and guest photos" />
-  <meta property="og:description" content="Invitations they'll remember. Photos you'll keep." />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Confetti · Wedding invitations that move</title>
+  <meta name="description" content="A wedding invitation your guests scroll through and reply to in a single tap. Five designs, edit anytime, pay once from €20." />
+  <meta property="og:title" content="Confetti · Wedding invitations that move" />
+  <meta property="og:description" content="A wedding invitation your guests scroll through and reply to in a single tap." />
   <meta property="og:image" content="https://confettiwedding.net/static/invite/og-linen.jpg" />
   <meta property="og:type" content="website" />
   <meta name="theme-color" content="#1C1714" />
@@ -14,13 +14,13 @@
   <link rel="apple-touch-icon" href="/static/logo-512.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Instrument+Sans:wght@400;500;600&family=Great+Vibes&display=swap" rel="stylesheet" />
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
     "@type": "Product",
     "name": "Confetti",
-    "description": "Wedding website invitations with RSVP in five animated designs, and a QR code that collects every guest's photos into one private gallery.",
+    "description": "Animated wedding invitations with RSVP in five designs, and a QR code that collects every guest's photos into one private gallery.",
     "brand": { "@type": "Brand", "name": "Confetti" },
     "offers": [
       { "@type": "Offer", "name": "Invitation + RSVP", "price": "20.00", "priceCurrency": "EUR", "url": "https://confettiwedding.net/create?plan=invite" },
@@ -31,315 +31,238 @@
   </script>
   <style>
     :root {
-      --night: #1C1714; --night-2: #26201B; --ivory: #F3EDE4; --paper: #FAF6F0; --ink: #1C1714; --ink-2: #5E544B; --muted: #8D8277;
-      --clay: #B5523F; --clay-2: #9E4535; --gold: #D9B77A; --line: rgba(28,23,20,.12); --line-dark: rgba(243,237,228,.14);
+      --night: #1C1714; --night-2: #2A231E; --ivory: #F3EDE4; --paper: #FBF7F1; --ink: #1C1714; --ink-2: #5E544B; --muted: #8D8277;
+      --clay: #B5523F; --clay-2: #9E4535; --gold: #D9B77A; --line: rgba(28,23,20,.12); --line-d: rgba(243,237,228,.14);
       --serif: "Instrument Serif", "Times New Roman", serif; --sans: "Instrument Sans", -apple-system, "Segoe UI", sans-serif;
       --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.5'/%3E%3C/svg%3E");
     }
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
-    body { font-family: var(--sans); background: var(--ivory); color: var(--ink); line-height: 1.55; -webkit-font-smoothing: antialiased; overflow-x: hidden; }
+    body { font-family: var(--sans); background: var(--ivory); color: var(--ink); line-height: 1.5; -webkit-font-smoothing: antialiased; overflow-x: hidden; }
     a { color: inherit; text-decoration: none; }
     img { display: block; max-width: 100%; }
-    .wrap { max-width: 1180px; margin: 0 auto; padding: 0 24px; }
+    .wrap { max-width: 1120px; margin: 0 auto; padding: 0 22px; }
     .dark { background: var(--night); color: var(--ivory); position: relative; isolation: isolate; }
-    .dark::after { content: ""; position: absolute; inset: 0; background-image: var(--grain); opacity: .09; mix-blend-mode: overlay; pointer-events: none; z-index: -1; }
-    .label { font-size: 12px; letter-spacing: .22em; text-transform: uppercase; font-weight: 500; }
-    .serif { font-family: var(--serif); font-weight: 400; }
-    em { font-style: italic; }
+    .dark::after { content: ""; position: absolute; inset: 0; background-image: var(--grain); opacity: .08; mix-blend-mode: overlay; pointer-events: none; z-index: -1; }
+    h1, h2 { font-family: var(--serif); font-weight: 400; letter-spacing: -.015em; }
+    h1 em, h2 em { font-style: italic; color: var(--gold); }
+    .light h2 em { color: var(--clay); }
+    .light .dark h2 em { color: var(--gold); }
 
-    .btn { display: inline-flex; align-items: center; justify-content: center; gap: 10px; height: 52px; padding: 0 26px; border-radius: 999px;
-      font-size: 15px; font-weight: 500; background: var(--clay); color: #fff; transition: background .2s, transform .15s; white-space: nowrap; }
+    /* One button style. Full width on phones. */
+    .btn { display: inline-flex; align-items: center; justify-content: center; height: 56px; padding: 0 30px; border-radius: 16px;
+      font-size: 16px; font-weight: 500; background: var(--clay); color: #fff; transition: background .2s, transform .15s; }
     .btn:hover { background: var(--clay-2); }
-    .btn:active { transform: translateY(1px); }
-    .btn.light { background: var(--ivory); color: var(--night); }
-    .btn.light:hover { background: #fff; }
-    .btn.line { background: transparent; color: inherit; box-shadow: inset 0 0 0 1px currentColor; }
-    .btn.line:hover { background: rgba(127,127,127,.08); }
-    .btn.sm { height: 40px; padding: 0 18px; font-size: 14px; }
-    .arrow { transition: transform .2s; } .btn:hover .arrow { transform: translateX(3px); }
+    .btn:active { transform: scale(.98); }
+    .btn.ivory { background: var(--ivory); color: var(--night); }
+    @media (max-width: 720px) { .btn.block-sm { display: flex; width: 100%; } }
 
     /* Nav */
-    nav.top { position: absolute; top: 0; left: 0; right: 0; z-index: 10; }
-    nav.top .wrap { display: flex; align-items: center; gap: 6px; height: 76px; }
-    .logo { font-family: var(--serif); font-size: 28px; margin-right: auto; display: flex; align-items: center; gap: 10px; color: var(--ivory); }
+    .nav { display: flex; align-items: center; height: 68px; }
+    .logo { font-family: var(--serif); font-size: 27px; display: flex; align-items: center; gap: 10px; margin-right: auto; }
     .logo img { width: 26px; height: 26px; border-radius: 7px; }
-    nav.top .link { color: rgba(243,237,228,.75); font-size: 14px; padding: 8px 12px; }
-    nav.top .link:hover { color: var(--ivory); }
-    @media (max-width: 760px) { nav.top .link.wide { display: none; } }
+    .nav a.in { font-size: 15px; color: rgba(243,237,228,.8); padding: 10px 4px 10px 16px; }
+    .nav a.in:hover { color: var(--ivory); }
 
-    /* Hero */
-    .hero { padding: 116px 0 88px; overflow: hidden; }
-    .hero .wrap { display: grid; gap: 56px; align-items: center; }
-    @media (min-width: 980px) { .hero .wrap { grid-template-columns: 1.05fr .95fr; } }
-    .hero .label { color: var(--gold); }
-    .hero h1 { font-family: var(--serif); font-weight: 400; font-size: clamp(50px, 6.4vw, 92px); line-height: .94; letter-spacing: -.02em; margin: 22px 0 26px; }
-    .hero h1 em { color: var(--gold); }
-    .hero p.lead { font-size: clamp(17px, 1.6vw, 19px); color: rgba(243,237,228,.72); max-width: 30em; }
-    .hero .ctas { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 34px; align-items: center; }
-    .hero .small { margin-top: 18px; font-size: 13px; color: rgba(243,237,228,.55); }
+    /* Hero: the product first */
+    .hero { padding: 12px 0 72px; }
+    .hero .grid { display: grid; gap: 26px; grid-template-areas: "copy" "stage" "cta"; }
+    .hero .copy { grid-area: copy; } .hero .stage { grid-area: stage; } .hero .cta { grid-area: cta; }
+    @media (min-width: 900px) { .hero .grid { grid-template-columns: 1fr 1fr; grid-template-areas: "copy stage" "cta stage"; column-gap: 64px; row-gap: 0; padding-top: 36px; align-items: end; }
+      .hero .cta { align-self: start; } }
+    .hero h1 { font-size: clamp(48px, 7vw, 96px); line-height: .95; }
+    .hero p { font-size: clamp(17px, 1.7vw, 21px); color: rgba(243,237,228,.75); margin: 16px 0 30px; max-width: 24em; }
+    @media (max-width: 899px) { .hero .copy { text-align: center; } .hero p { margin: 12px auto 0; } .hero h1 { font-size: clamp(44px, 12vw, 60px); } }
 
-    .phones { position: relative; height: clamp(520px, 62vw, 640px); }
-    .phone { position: absolute; width: clamp(196px, 21vw, 250px); aspect-ratio: 9 / 18.5; border-radius: 38px; padding: 8px; background: #0B0908;
-      box-shadow: 0 50px 90px rgba(0,0,0,.5), 0 0 0 1px rgba(255,255,255,.06); overflow: hidden; }
-    .phone .scr { width: 100%; height: 100%; border-radius: 31px; overflow: hidden; position: relative; background: #111; }
-    .phone iframe { position: absolute; top: 0; left: 0; width: 390px; height: 802px; border: 0; transform-origin: 0 0; pointer-events: none; }
-    .phone .tag { position: absolute; left: 50%; bottom: -34px; transform: translateX(-50%); font-family: var(--serif); font-style: italic; font-size: 18px; color: rgba(243,237,228,.6); }
-    .phone:nth-child(1) { left: 0; top: 70px; transform: rotate(-7deg); }
-    .phone:nth-child(2) { left: 50%; top: 0; margin-left: calc(clamp(196px, 21vw, 250px) / -2); z-index: 2; }
-    .phone:nth-child(3) { right: 0; top: 90px; transform: rotate(7deg); }
-    @media (max-width: 640px) { .phones { height: 520px; } .phone:nth-child(1), .phone:nth-child(3) { display: none; } }
+    .stage { display: flex; flex-direction: column; align-items: center; gap: 22px; }
+    .phone { display: block; width: min(64vw, 300px); aspect-ratio: 9 / 18.6; border-radius: 46px; padding: 9px; background: #0B0908;
+      box-shadow: 0 50px 100px rgba(0,0,0,.55), 0 0 0 1px rgba(255,255,255,.07); }
+    .phone .scr { width: 100%; height: 100%; border-radius: 38px; overflow: hidden; position: relative; background: #111; }
+    .phone iframe { position: absolute; top: 0; left: 0; width: 390px; height: 806px; border: 0; transform-origin: 0 0; pointer-events: none; }
+    .phone img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: top; transition: opacity .5s; }
+    .phone img.gone { opacity: 0; }
+    .chips { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
+    .chips button { font: inherit; font-size: 14px; color: rgba(243,237,228,.7); background: transparent; border: 1px solid var(--line-d); border-radius: 999px; padding: 8px 14px; cursor: pointer; }
+    .chips button[aria-pressed="true"] { background: var(--ivory); color: var(--night); border-color: var(--ivory); }
 
-    /* Design names marquee */
-    .ribbon { border-block: 1px solid var(--line-dark); padding: 22px 0; overflow: hidden; }
-    .ribbon div { display: flex; width: max-content; animation: slide 36s linear infinite; }
-    .ribbon span { font-family: var(--serif); font-style: italic; font-size: clamp(34px, 5vw, 56px); padding: 0 .55em; color: rgba(243,237,228,.88); white-space: nowrap; }
-    .ribbon span:nth-child(even) { color: var(--gold); font-style: normal; }
-    @keyframes slide { to { transform: translateX(-50%); } }
+    /* Statements: big line + a picture that proves it */
+    .stmt { padding: 96px 0; }
+    .stmt .grid { display: grid; gap: 40px; align-items: center; }
+    @media (min-width: 900px) { .stmt .grid { grid-template-columns: 1fr 1fr; gap: 80px; } .stmt.flip .pic { order: -1; } }
+    .stmt h2 { font-size: clamp(42px, 6vw, 76px); line-height: .98; }
+    @media (max-width: 899px) { .stmt h2 { text-align: center; } }
+    .pic { display: grid; place-items: center; }
 
-    /* Section heads */
-    section.block { padding: 120px 0; }
-    .head { display: grid; gap: 22px; margin-bottom: 56px; }
-    @media (min-width: 900px) { .head { grid-template-columns: 1fr 1fr; align-items: end; } }
-    .head h2 { font-family: var(--serif); font-weight: 400; font-size: clamp(44px, 6vw, 76px); line-height: .98; letter-spacing: -.015em; }
-    .head p { color: var(--ink-2); font-size: 18px; max-width: 28em; }
-    .dark .head p { color: rgba(243,237,228,.7); }
-    .head .label { color: var(--clay); margin-bottom: 14px; display: block; }
+    /* Edit demo: the date rewrites itself */
+    .card { width: min(100%, 360px); background: var(--paper); border-radius: 24px; padding: 40px 28px; text-align: center; box-shadow: 0 30px 60px rgba(28,23,20,.12); }
+    .card .names { font-family: "Great Vibes", cursive; font-size: 46px; line-height: 1.1; color: #2E2620; }
+    .card .date { font-family: var(--serif); font-size: 24px; margin-top: 12px; min-height: 1.4em; color: #2E2620; }
+    .card .date .cur { display: inline-block; width: 2px; height: 1em; background: var(--clay); vertical-align: -3px; margin-left: 2px; animation: blink 1s steps(1) infinite; }
+    @keyframes blink { 50% { opacity: 0; } }
+    .card .saved { display: inline-block; margin-top: 18px; font-size: 13px; color: #2F7D4F; background: #E8F4EC; border-radius: 999px; padding: 5px 12px; opacity: 0; transition: opacity .3s; }
+    .card .saved.on { opacity: 1; }
 
-    /* Designs rail */
-    .rail { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(220px, 1fr); gap: 18px; overflow-x: auto; scroll-snap-type: x mandatory; padding-bottom: 8px; scrollbar-width: none; }
-    .rail::-webkit-scrollbar { display: none; }
-    .design { scroll-snap-align: start; display: block; }
-    .design .pic { aspect-ratio: 9 / 16; border-radius: 22px; background-size: cover; background-position: center; box-shadow: 0 24px 50px rgba(28,23,20,.14);
-      transition: transform .5s cubic-bezier(.2,.8,.2,1), box-shadow .5s; position: relative; overflow: hidden; }
-    .design:hover .pic { transform: translateY(-8px); box-shadow: 0 36px 70px rgba(28,23,20,.2); }
-    .design .pic::after { content: "Open live ↗"; position: absolute; left: 14px; bottom: 14px; font-size: 13px; font-weight: 500; padding: 8px 14px; border-radius: 999px;
-      background: rgba(28,23,20,.82); color: var(--ivory); opacity: 0; transform: translateY(6px); transition: .3s; }
-    .design:hover .pic::after { opacity: 1; transform: none; }
-    .design .meta { display: flex; align-items: baseline; gap: 10px; margin-top: 16px; }
-    .design .n { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
-    .design h3 { font-family: var(--serif); font-weight: 400; font-size: 30px; }
-    .design p { font-size: 14px; color: var(--ink-2); margin-top: 2px; }
+    /* Replies demo: the list fills */
+    .list { width: min(100%, 380px); background: var(--paper); border-radius: 24px; padding: 10px 22px; box-shadow: 0 30px 60px rgba(28,23,20,.12); }
+    .list .row { display: flex; justify-content: space-between; align-items: center; padding: 16px 0; border-bottom: 1px solid var(--line); font-size: 16px;
+      opacity: 0; transform: translateY(10px); transition: opacity .5s, transform .5s; }
+    .list .row:last-child { border-bottom: 0; }
+    .list .row.on { opacity: 1; transform: none; }
+    .list .yes { color: #2F7D4F; font-weight: 500; } .list .no { color: var(--muted); }
+    .list .total { font-family: var(--serif); font-size: 44px; text-align: center; padding: 14px 0 6px; }
+    .list .total small { display: block; font-family: var(--sans); font-size: 13px; color: var(--muted); }
 
-    /* Steps */
-    .steps { display: grid; gap: 0; border-top: 1px solid var(--line); }
-    .step { display: grid; grid-template-columns: 64px 1fr; gap: 18px; padding: 30px 0; border-bottom: 1px solid var(--line); align-items: baseline; }
-    @media (min-width: 900px) { .step { grid-template-columns: 120px 1fr 1fr; } }
-    .step .n { font-family: var(--serif); font-size: 40px; color: var(--clay); line-height: 1; }
-    .step h3 { font-family: var(--serif); font-weight: 400; font-size: clamp(30px, 3.4vw, 40px); line-height: 1.05; }
-    .step p { color: var(--ink-2); font-size: 17px; grid-column: 2; }
-    @media (min-width: 900px) { .step p { grid-column: auto; } }
+    /* Photos: a printed table card */
+    .qrcard { width: min(100%, 320px); aspect-ratio: 4 / 5; background: var(--paper); color: var(--ink); border-radius: 8px; padding: 34px 30px; text-align: center;
+      box-shadow: 0 40px 80px rgba(0,0,0,.45); transform: rotate(-3deg); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; }
+    .qrcard .names { font-family: "Great Vibes", cursive; font-size: 40px; line-height: 1; }
+    .qrcard img { width: 62%; }
 
-    /* Photos */
-    .photos .wrap { display: grid; gap: 64px; align-items: center; }
-    @media (min-width: 980px) { .photos .wrap { grid-template-columns: 1fr 1fr; } }
-    .ticks { list-style: none; margin-top: 30px; display: grid; gap: 14px; }
-    .ticks li { display: flex; gap: 14px; font-size: 17px; color: rgba(243,237,228,.82); }
-    .ticks li::before { content: ""; width: 22px; height: 1px; background: var(--gold); margin-top: 13px; flex-shrink: 0; }
-    .table-card { position: relative; justify-self: center; width: min(100%, 420px); aspect-ratio: 4 / 5; }
-    .tc { position: absolute; inset: 8% 10%; background: var(--paper); color: var(--ink); border-radius: 6px; padding: 9% 10%; text-align: center;
-      box-shadow: 0 40px 80px rgba(0,0,0,.45); transform: rotate(-3deg); display: flex; flex-direction: column; align-items: center; gap: 14px; }
-    .tc .serif { font-size: clamp(30px, 4vw, 40px); line-height: 1; }
-    .tc .label { color: var(--clay); font-size: 11px; }
-    .tc img { width: 58%; margin: 6px 0; }
-    .tc small { font-size: 12px; color: var(--muted); }
-    .shots { position: absolute; right: -2%; bottom: 0; display: grid; grid-template-columns: repeat(2, 64px); gap: 6px; transform: rotate(6deg); }
-    .shots i { aspect-ratio: 1; border-radius: 8px; box-shadow: 0 10px 20px rgba(0,0,0,.3); }
+    /* Pricing: three rows */
+    .prices { padding: 96px 0; }
+    .prices h2 { font-size: clamp(42px, 6vw, 76px); line-height: .98; text-align: center; margin-bottom: 40px; }
+    .rows { max-width: 640px; margin: 0 auto; display: grid; gap: 10px; }
+    .row-p { display: flex; align-items: center; gap: 16px; padding: 22px 24px; border-radius: 20px; background: var(--paper); border: 1px solid var(--line);
+      transition: transform .2s, box-shadow .2s; }
+    .row-p:hover { transform: translateY(-2px); box-shadow: 0 14px 30px rgba(28,23,20,.08); }
+    .row-p b { font-weight: 500; font-size: 18px; margin-right: auto; }
+    .row-p .p { font-family: var(--serif); font-size: 40px; line-height: 1; }
+    .row-p.best { background: var(--night); color: var(--ivory); border-color: var(--night); }
+    .row-p .tag { font-size: 12px; font-weight: 600; background: var(--gold); color: var(--night); border-radius: 999px; padding: 4px 10px; }
 
-    /* Pricing */
-    .plans { display: grid; gap: 16px; }
-    @media (min-width: 900px) { .plans { grid-template-columns: repeat(3, 1fr); align-items: stretch; } }
-    .plan { border: 1px solid var(--line); border-radius: 26px; padding: 34px 30px 30px; display: flex; flex-direction: column; background: var(--paper); }
-    .plan.best { background: var(--night); color: var(--ivory); border-color: var(--night); position: relative; }
-    .plan .label { color: var(--clay); }
-    .plan.best .label { color: var(--gold); }
-    .plan .price { font-family: var(--serif); font-size: 76px; line-height: 1; margin: 18px 0 6px; }
-    .plan .price small { font-family: var(--sans); font-size: 15px; color: var(--muted); margin-left: 6px; }
-    .plan.best .price small { color: rgba(243,237,228,.55); }
-    .plan ul { list-style: none; margin: 18px 0 30px; display: grid; gap: 10px; flex: 1; }
-    .plan li { font-size: 15px; color: var(--ink-2); padding-left: 26px; position: relative; }
-    .plan.best li { color: rgba(243,237,228,.78); }
-    .plan li::before { content: ""; position: absolute; left: 0; top: 11px; width: 14px; height: 1px; background: currentColor; opacity: .6; }
-    .plan .btn { width: 100%; }
-    .save { position: absolute; top: 22px; right: 22px; background: var(--gold); color: var(--night); font-size: 12px; font-weight: 600; padding: 5px 12px; border-radius: 999px; }
-    .note { text-align: center; color: var(--muted); font-size: 14px; margin-top: 26px; }
-
-    /* FAQ */
-    .faq-grid { display: grid; gap: 40px; }
-    @media (min-width: 900px) { .faq-grid { grid-template-columns: .8fr 1.2fr; } }
+    /* Questions */
+    .faq { padding: 0 0 96px; }
+    .faq .list-q { max-width: 640px; margin: 0 auto; }
     .faq details { border-bottom: 1px solid var(--line); }
     .faq details:first-child { border-top: 1px solid var(--line); }
-    .faq summary { cursor: pointer; list-style: none; padding: 24px 0; font-family: var(--serif); font-size: clamp(22px, 2.4vw, 28px); display: flex; justify-content: space-between; gap: 20px; }
+    .faq summary { cursor: pointer; list-style: none; padding: 22px 0; font-family: var(--serif); font-size: 25px; display: flex; justify-content: space-between; gap: 20px; }
     .faq summary::-webkit-details-marker { display: none; }
     .faq summary::after { content: "+"; font-family: var(--sans); font-weight: 300; color: var(--clay); transition: transform .3s; }
     .faq details[open] summary::after { transform: rotate(45deg); }
-    .faq details p { color: var(--ink-2); font-size: 17px; padding-bottom: 24px; max-width: 36em; }
+    .faq details p { color: var(--ink-2); font-size: 17px; padding-bottom: 22px; }
 
     /* End */
-    .end { text-align: center; padding: 140px 0 120px; }
-    .end h2 { font-family: var(--serif); font-weight: 400; font-size: clamp(56px, 9vw, 128px); line-height: .92; letter-spacing: -.02em; margin-bottom: 40px; }
-    .end h2 em { color: var(--gold); }
-    footer { border-top: 1px solid var(--line-dark); }
-    footer .wrap { display: flex; flex-wrap: wrap; gap: 10px 24px; padding-top: 28px; padding-bottom: 28px; font-size: 13px; color: rgba(243,237,228,.55); }
+    .end { text-align: center; padding: 110px 0; }
+    .end h2 { font-size: clamp(54px, 9vw, 120px); line-height: .92; margin-bottom: 40px; }
+    footer { padding: 30px 0 40px; font-size: 14px; color: var(--muted); }
+    footer .wrap { display: flex; flex-wrap: wrap; gap: 8px 22px; }
     footer .wrap span { margin-right: auto; }
-    footer a:hover { color: var(--ivory); }
+    footer a:hover { color: var(--ink); }
 
-    /* Phone sticky CTA */
-    .sticky { position: fixed; left: 12px; right: 12px; bottom: calc(12px + env(safe-area-inset-bottom)); z-index: 30; display: flex; align-items: center; gap: 12px;
-      padding: 10px 10px 10px 20px; border-radius: 999px; background: rgba(28,23,20,.92); color: var(--ivory); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
-      transform: translateY(140%); transition: transform .4s cubic-bezier(.2,.8,.2,1); }
+    /* Phones: one button that stays in reach */
+    .sticky { position: fixed; left: 14px; right: 14px; bottom: calc(14px + env(safe-area-inset-bottom)); z-index: 30;
+      transform: translateY(150%); transition: transform .4s cubic-bezier(.2,.8,.2,1); }
     .sticky.show { transform: none; }
-    .sticky span { font-size: 14px; margin-right: auto; }
-    .sticky .btn { height: 44px; }
-    @media (min-width: 760px) { .sticky { display: none; } }
+    .sticky .btn { width: 100%; box-shadow: 0 14px 30px rgba(0,0,0,.25); }
+    @media (min-width: 900px) { .sticky { display: none; } }
 
-    .rv { opacity: 0; transform: translateY(26px); transition: opacity .9s ease, transform .9s cubic-bezier(.2,.8,.2,1); }
+    .rv { opacity: 0; transform: translateY(24px); transition: opacity .9s ease, transform .9s cubic-bezier(.2,.8,.2,1); }
     .rv.in { opacity: 1; transform: none; }
-    .hero .rv { transition-duration: 1.1s; }
-    @media (prefers-reduced-motion: reduce) { .rv { opacity: 1; transform: none; } .ribbon div { animation: none; } }
+    @media (prefers-reduced-motion: reduce) { .rv { opacity: 1; transform: none; } }
   </style>
 </head>
 <body>
 <header class="dark">
-  <nav class="top" aria-label="Main">
-    <div class="wrap">
+  <div class="wrap">
+    <nav class="nav" aria-label="Main">
       <a href="/" class="logo"><img src="/static/logo.png" alt="" />Confetti</a>
-      <a href="#designs" class="link wide">Designs</a>
-      <a href="#photos" class="link wide">Photos</a>
-      <a href="#pricing" class="link wide">Pricing</a>
-      <a href="/login" class="link">Log in</a>
-      <a href="/create?plan=bundle" class="btn sm light">Start yours</a>
-    </div>
-  </nav>
-
+      <a href="/login" class="in">Log in</a>
+    </nav>
+  </div>
   <section class="hero" aria-labelledby="h1">
-    <div class="wrap">
-      <div>
-        <div class="label rv">Wedding invitations &amp; guest photos</div>
-        <h1 id="h1" class="rv" style="transition-delay:.1s">Invitations they'll <em>remember.</em> Photos you'll <em>keep.</em></h1>
-        <p class="lead rv" style="transition-delay:.2s">A wedding website your guests scroll through and reply to in a tap. Then one QR code on your tables that gathers every photo they take.</p>
-        <div class="ctas rv" style="transition-delay:.3s">
-          <a href="#designs" class="btn">Choose your design <span class="arrow">→</span></a>
-          <a href="/demo/noir" target="_blank" rel="noopener" class="btn line">Open a live invitation ↗</a>
-        </div>
-        <div class="small rv" style="transition-delay:.4s">From €20 · Pay once · No app for guests</div>
+    <div class="wrap grid">
+      <div class="copy">
+        <h1 id="h1">Invitations that <em>move.</em></h1>
+        <p>A wedding invitation your guests scroll through and reply to in a single tap.</p>
       </div>
-      <div class="phones" aria-label="Live examples of three designs">
-        <div class="phone"><div class="scr"><iframe title="Linen design" data-src="/demo/linen?loop=1" loading="lazy" tabindex="-1"></iframe></div><span class="tag">Linen</span></div>
-        <div class="phone"><div class="scr"><iframe title="Noir design" data-src="/demo/noir?loop=1" tabindex="-1"></iframe></div><span class="tag">Noir</span></div>
-        <div class="phone"><div class="scr"><iframe title="Riviera design" data-src="/demo/riviera?loop=1" loading="lazy" tabindex="-1"></iframe></div><span class="tag">Riviera</span></div>
+      <div class="cta"><a href="/create?plan=invite" class="btn block-sm" id="heroCta">Create your invitation</a></div>
+      <div class="stage">
+        <a class="phone" id="phone" href="/demo/linen" target="_blank" rel="noopener" aria-label="Open this design">
+          <div class="scr"><img id="poster" src="/static/invite/thumb-linen.jpg" alt="" /><iframe id="demo" title="Design preview" tabindex="-1"></iframe></div>
+        </a>
+        <div class="chips" id="chips" role="group" aria-label="Designs"></div>
       </div>
     </div>
   </section>
-  <div class="ribbon" aria-hidden="true"><div id="ribbon"></div></div>
 </header>
 
-<main>
-  <section class="block" id="designs" aria-labelledby="d-h">
-    <div class="wrap">
-      <div class="head rv">
-        <div><span class="label">The invitation</span><h2 id="d-h">Five designs. <em>Your</em> story.</h2></div>
-        <p>Each one comes with the schedule, dress code and questions already written. Change what you like, delete what you don't, send one link.</p>
-      </div>
-      <div class="rail rv" id="rail"></div>
-    </div>
-  </section>
-
-  <section class="block" style="padding-top:0" aria-labelledby="s-h">
-    <div class="wrap">
-      <div class="head rv"><div><span class="label">How it works</span><h2 id="s-h">Ready tonight.</h2></div></div>
-      <div class="steps">
-        <div class="step rv"><span class="n">01</span><h3>Pick a design</h3><p>Open each one live first. Your words go in, the animation stays.</p></div>
-        <div class="step rv"><span class="n">02</span><h3>Make it yours</h3><p>Names, date, the day's plan, your story, photos. Watch it update as you type.</p></div>
-        <div class="step rv"><span class="n">03</span><h3>Send one link</h3><p>WhatsApp, Viber, email or QR. Replies arrive in your list, ready for the caterer.</p></div>
-      </div>
-    </div>
-  </section>
-
-  <section class="block dark photos" id="photos" aria-labelledby="p-h">
-    <div class="wrap">
-      <div class="rv">
-        <span class="label" style="color:var(--gold)">On the day</span>
-        <h2 id="p-h" class="serif" style="font-size:clamp(44px,6vw,76px);line-height:.98;margin:14px 0 22px">Every photo your guests take. <em style="color:var(--gold)">One place.</em></h2>
-        <p style="color:rgba(243,237,228,.7);font-size:18px;max-width:28em">Put one QR code on your tables. Guests scan, add their photos and videos, and they land in a gallery only you can open.</p>
-        <ul class="ticks">
-          <li>No app, no account for guests</li>
-          <li>Full quality photos and videos</li>
-          <li>Download everything in one zip</li>
-          <li>Kept for 12 months</li>
-        </ul>
-      </div>
-      <div class="table-card rv" aria-hidden="true">
-        <div class="tc">
-          <span class="label">Share your photos</span>
-          <span class="serif">Sofia &amp; Daniel</span>
-          <img src="/static/qr-demo.svg" alt="" />
-          <small>Scan with your camera</small>
+<main class="light">
+  <section class="stmt" aria-labelledby="s1">
+    <div class="wrap grid">
+      <h2 id="s1" class="rv">Change anything. <em>Even after it's sent.</em></h2>
+      <div class="pic rv">
+        <div class="card" aria-hidden="true">
+          <div class="names">Sofia &amp; Daniel</div>
+          <div class="date"><span id="typed">Saturday, 12 June</span><span class="cur"></span></div>
+          <span class="saved" id="saved">Updated for every guest</span>
         </div>
-        <div class="shots"><i style="background:#C9A07A"></i><i style="background:#8E9A86"></i><i style="background:#D8B9A6"></i><i style="background:#6F6157"></i></div>
       </div>
     </div>
   </section>
 
-  <section class="block" id="pricing" aria-labelledby="pr-h">
+  <section class="stmt flip" aria-labelledby="s2" style="padding-top:0">
+    <div class="wrap grid">
+      <h2 id="s2" class="rv">Every reply, <em>in one list.</em></h2>
+      <div class="pic rv">
+        <div class="list" id="replies" aria-hidden="true">
+          <div class="row on"><span>Eleni Kyriakou</span><span class="yes">Coming · 2</span></div>
+          <div class="row"><span>Marios Charalambous</span><span class="yes">Coming</span></div>
+          <div class="row"><span>Anna Georgiou</span><span class="no">Can't make it</span></div>
+          <div class="row"><span>Nikos &amp; Maria</span><span class="yes">Coming · 4</span></div>
+          <div class="row total on"><span style="width:100%"><span id="count">2</span><small>coming</small></span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="stmt dark" aria-labelledby="s3">
+    <div class="wrap grid">
+      <h2 id="s3" class="rv">One QR code. <em>Every guest's photos.</em></h2>
+      <div class="pic rv">
+        <div class="qrcard" aria-hidden="true">
+          <div class="names">Sofia &amp; Daniel</div>
+          <img src="/static/qr-demo.svg" alt="" />
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="prices" id="pricing" aria-labelledby="pr">
     <div class="wrap">
-      <div class="head rv">
-        <div><span class="label">Pricing</span><h2 id="pr-h">Pay once. <em>Keep</em> it simple.</h2></div>
-        <p>No subscription, no per-guest fees. Start with one and add the other any time.</p>
-      </div>
-      <div class="plans">
-        <article class="plan rv">
-          <span class="label">Invitation + RSVP</span>
-          <div class="price">€20</div>
-          <ul><li>All five designs</li><li>Unlimited guests and replies</li><li>RSVP list and spreadsheet</li><li>Edit any time, same link</li></ul>
-          <a class="btn line" href="/create?plan=invite">Start with the invitation</a>
-        </article>
-        <article class="plan best rv" style="transition-delay:.08s">
-          <span class="save">Save €6</span>
-          <span class="label">Both</span>
-          <div class="price">€39</div>
-          <ul><li>The invitation, before the wedding</li><li>The photo gallery, on the day</li><li>One account for both</li><li>After the day, the invitation asks guests for their photos</li></ul>
-          <a class="btn light" href="/create?plan=bundle">Get both <span class="arrow">→</span></a>
-        </article>
-        <article class="plan rv" style="transition-delay:.16s">
-          <span class="label">Photo gallery</span>
-          <div class="price">€25</div>
-          <ul><li>Your QR code, ready to print</li><li>Unlimited guests and uploads</li><li>Private, password protected</li><li>12 months, one-click download</li></ul>
-          <a class="btn line" href="/create?plan=photos">Start with photos</a>
-        </article>
-      </div>
-      <p class="note">Secure checkout by Stripe. VAT included.</p>
-    </div>
-  </section>
-
-  <section class="block" style="padding-top:0" aria-labelledby="f-h">
-    <div class="wrap faq-grid">
-      <div class="rv"><span class="label" style="color:var(--clay)">Questions</span><h2 id="f-h" class="serif" style="font-size:clamp(44px,6vw,76px);line-height:.98;margin-top:14px">Good to know.</h2></div>
-      <div class="faq rv">
-        <details><summary>Do guests need an app?</summary><p>No. The invitation and the photo page open in any phone browser, from one link or one QR code.</p></details>
-        <details><summary>Can we change it after sending?</summary><p>Yes. Every change shows up on the same link straight away.</p></details>
-        <details><summary>Can we see the designs before paying?</summary><p>Yes. Every design opens live, with a sample couple, right on this page.</p></details>
-        <details><summary>Who sees the photos?</summary><p>Only you, with your password. Guests can add photos but never see anyone else's.</p></details>
-        <details><summary>Can we start with one and add the other later?</summary><p>Yes. Add the invitation or the gallery from your account at any time.</p></details>
+      <h2 id="pr" class="rv">Pay once.</h2>
+      <div class="rows rv">
+        <a class="row-p" href="/create?plan=invite"><b>Invitation</b><span class="p">€20</span></a>
+        <a class="row-p" href="/create?plan=photos"><b>Photo gallery</b><span class="p">€25</span></a>
+        <a class="row-p best" href="/create?plan=bundle"><b>Both</b><span class="tag">Save €6</span><span class="p">€39</span></a>
       </div>
     </div>
   </section>
 
-  <section class="dark end" aria-labelledby="e-h">
+  <section class="faq" aria-label="Questions">
+    <div class="wrap list-q">
+      <details><summary>Do guests need an app?</summary><p>No. They tap your link and it opens.</p></details>
+      <details><summary>Can we see the designs first?</summary><p>Yes. Tap the designs at the top of this page.</p></details>
+      <details><summary>Who sees the photos?</summary><p>Only you.</p></details>
+      <details><summary>Can we add the other one later?</summary><p>Yes, any time from your account.</p></details>
+    </div>
+  </section>
+
+  <section class="end dark" aria-labelledby="end">
     <div class="wrap">
-      <h2 id="e-h" class="rv">Start with<br><em>your names.</em></h2>
-      <a href="/create?plan=bundle" class="btn light rv">Start yours <span class="arrow">→</span></a>
+      <h2 id="end" class="rv">Start with <em>your names.</em></h2>
+      <a href="/create?plan=invite" class="btn ivory block-sm" id="endCta">Create your invitation</a>
     </div>
-    <footer>
-      <div class="wrap">
-        <span>Confetti · Made for people getting married</span>
-        <a href="/login">Log in</a><a href="/terms">Terms</a><a href="/privacy">Privacy</a><a href="mailto:support@confettiwedding.net">Support</a>
-      </div>
-    </footer>
   </section>
 </main>
 
-<div class="sticky" id="sticky"><span>From €20 · pay once</span><a href="/create?plan=bundle" class="btn">Start yours</a></div>
+<footer>
+  <div class="wrap">
+    <span>Confetti</span>
+    <a href="/login">Log in</a><a href="/terms">Terms</a><a href="/privacy">Privacy</a><a href="mailto:support@confettiwedding.net">Support</a>
+  </div>
+</footer>
+
+<div class="sticky" id="sticky"><a href="/create?plan=invite" class="btn">Create your invitation</a></div>
 
 <script src="/static/invite/designs.js"></script>
 <script>
@@ -347,36 +270,64 @@
 (function () {
   const $ = (id) => document.getElementById(id);
 
-  // Design rail: the five designs, each opens live.
-  const D = ConfettiDesigns.DESIGNS;
-  $("rail").innerHTML = Object.entries(D).map(([id, d], i) => `
-    <a class="design" href="/demo/${id}" target="_blank" rel="noopener">
-      <div class="pic" style="background-image:url('/static/invite/thumb-${id}.jpg')"></div>
-      <div class="meta"><span class="n">0${i + 1}</span><h3>${d.label}</h3></div>
-      <p>${d.note}</p>
-    </a>`).join("");
-
-  // Ribbon of design names.
-  const names = Object.values(D).map((d) => d.label);
-  $("ribbon").innerHTML = [...names, ...names, ...names, ...names].map((n) => `<span>${n}</span>`).join("");
-
-  // Live phones: the real invitation pages, scrolling themselves.
-  function fit() { document.querySelectorAll(".phone iframe").forEach((f) => { f.style.transform = `scale(${f.parentElement.clientWidth / 390})`; }); }
-  const start = () => document.querySelectorAll(".phone iframe").forEach((f, i) => {
-    if (getComputedStyle(f.closest(".phone")).display === "none") return;
-    setTimeout(() => { f.src = f.dataset.src; }, i * 900);
-  });
+  // The phone: a live design, switched by the chips under it.
+  const D = ConfettiDesigns.DESIGNS, frame = $("demo");
+  let current = "linen";
+  function fit() { frame.style.transform = `scale(${frame.parentElement.clientWidth / 390})`; }
+  function show(id) {
+    current = id;
+    $("poster").src = `/static/invite/thumb-${id}.jpg`; $("poster").classList.remove("gone");
+    frame.src = `/demo/${id}?loop=1`;
+    $("phone").href = `/demo/${id}`;
+    document.querySelectorAll("#chips button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.id === id)));
+  }
+  frame.addEventListener("load", () => setTimeout(() => $("poster").classList.add("gone"), 400));
+  $("chips").innerHTML = Object.entries(D).map(([id, d]) => `<button type="button" data-id="${id}">${d.label}</button>`).join("");
+  $("chips").addEventListener("click", (e) => { const b = e.target.closest("button"); if (b && b.dataset.id !== current) show(b.dataset.id); });
   fit(); addEventListener("resize", fit);
-  if (document.readyState === "complete") start(); else addEventListener("load", start);
+  if (document.readyState === "complete") show("linen"); else addEventListener("load", () => show("linen"));
 
-  // Reveal on scroll.
-  const io = "IntersectionObserver" in window && new IntersectionObserver((es) => es.forEach((e) => {
-    if (e.isIntersecting) { e.target.classList.add("in"); io.unobserve(e.target); }
-  }), { rootMargin: "0px 0px -8% 0px" });
-  document.querySelectorAll(".rv").forEach((n) => io ? io.observe(n) : n.classList.add("in"));
+  // Reveal, and start each small demo when it comes into view.
+  const io = new IntersectionObserver((es) => es.forEach((e) => {
+    if (!e.isIntersecting) return;
+    e.target.classList.add("in"); io.unobserve(e.target);
+    if (e.target.querySelector("#typed")) editDemo();
+    if (e.target.querySelector("#replies")) repliesDemo();
+  }), { rootMargin: "0px 0px -12% 0px" });
+  document.querySelectorAll(".rv").forEach((n) => io.observe(n));
 
-  // Phone: a sticky button once the hero is gone.
-  addEventListener("scroll", () => $("sticky").classList.toggle("show", scrollY > innerHeight * .8), { passive: true });
+  // "Change anything": the date is deleted and retyped, then saved.
+  function editDemo() {
+    const el = $("typed"), dates = ["Saturday, 12 June", "Sunday, 13 June"];
+    let i = 0;
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+    (async function loop() {
+      for (;;) {
+        await wait(1400); $("saved").classList.remove("on");
+        const from = dates[i % 2], to = dates[(i + 1) % 2];
+        for (let n = from.length; n >= 0; n--) { el.textContent = from.slice(0, n); await wait(45); }
+        await wait(250);
+        for (let n = 1; n <= to.length; n++) { el.textContent = to.slice(0, n); await wait(80); }
+        await wait(300); $("saved").classList.add("on"); i++;
+        await wait(2400);
+      }
+    })();
+  }
+
+  // "Every reply": rows arrive one by one, the total counts up.
+  function repliesDemo() {
+    const rows = [...$("replies").querySelectorAll(".row:not(.on)")], adds = [1, 0, 4];
+    let total = 2;
+    rows.forEach((r, i) => setTimeout(() => { r.classList.add("on"); total += adds[i]; $("count").textContent = total; }, 600 + i * 800));
+  }
+
+  // Phones: a button in reach once the first one has scrolled away, hidden at the end.
+  const sticky = $("sticky");
+  addEventListener("scroll", () => {
+    const top = $("heroCta").getBoundingClientRect().bottom < 0;
+    const end = $("endCta").getBoundingClientRect().top < innerHeight;
+    sticky.classList.toggle("show", top && !end);
+  }, { passive: true });
 })();
 </script>
 </body>
