@@ -164,3 +164,24 @@ button { font: inherit; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; transition: none !important; }
 }
+
+/* Styled confirm/alert dialogs (dialog.js) */
+.cdlg-back {
+  position: fixed; inset: 0; z-index: 300; display: flex; align-items: center; justify-content: center;
+  padding: 1rem; background: rgba(43,36,32,.45); backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px);
+  opacity: 0; transition: opacity .16s;
+}
+.cdlg-back.show { opacity: 1; }
+.cdlg {
+  width: 100%; max-width: 400px; background: var(--surface); border-radius: var(--radius-lg);
+  box-shadow: 0 20px 60px rgba(43,36,32,.25); padding: 1.75rem 1.5rem 1.4rem; text-align: center;
+  transform: translateY(8px) scale(.98); transition: transform .16s;
+}
+.cdlg-back.show .cdlg { transform: none; }
+.cdlg h2 { font-family: var(--serif); font-size: 1.7rem; font-weight: 600; line-height: 1.15; margin-bottom: .5rem; color: var(--ink); }
+.cdlg p { color: var(--ink-soft); font-size: .95rem; line-height: 1.5; margin-bottom: 1.4rem; }
+.cdlg-actions { display: flex; gap: .6rem; justify-content: center; flex-wrap: wrap; }
+.cdlg-actions .btn { flex: 1 1 140px; }
+.btn-delete { background: var(--err); box-shadow: 0 6px 18px rgba(163,58,47,.22); }
+.btn-delete:hover:not(:disabled) { background: #8A2F25; }
+.cdlg .btn:focus:not(:focus-visible) { outline: none; }

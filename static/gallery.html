@@ -51,6 +51,12 @@
       background: var(--accent-soft); border-radius: var(--radius); padding: .9rem 1.1rem; margin-bottom: 1.25rem; }
     .notice p { margin: 0; color: var(--ink-soft); font-size: .92rem; flex: 1 1 260px; }
     .notice b { color: var(--ink); }
+    .notice .btn-soft { background: var(--surface); }
+    .notice .btn-soft:hover:not(:disabled) { background: #fff; border-color: #EBC6C0; }
+    @media (max-width: 600px) {
+      .notice { flex-direction: column; align-items: flex-start; gap: .6rem; }
+      .notice p { flex: none; }
+    }
     .share-panel {
       display: flex; align-items: center; gap: 1.1rem; background: var(--surface); border: 1px solid var(--line);
       border-radius: var(--radius-lg); padding: 1rem 1.1rem; margin-bottom: 1.5rem; box-shadow: var(--shadow);
@@ -165,7 +171,7 @@
   </div>
 
   <div class="notice" id="freeNotice" hidden>
-    <p><b>Got everything?</b> Once your download has finished, you can free up your gallery. Your downloaded copy stays yours.</p>
+    <p><b>Got everything?</b> Once your download has finished, you can free up your gallery.</p>
     <button class="btn btn-soft btn-sm" id="freeUpBtn" type="button">Free up gallery</button>
   </div>
   <div class="notice" id="keepNotice" hidden>
@@ -197,6 +203,7 @@
   </div>
 </div>
 
+<script src="/static/dialog.js"></script>
 <script>
   "use strict";
 
@@ -555,7 +562,7 @@
   async function deleteSelected() {
     const keys = [...selected];
     const n = keys.length;
-    if (!confirm(`Delete ${n} selected photo${n === 1 ? "" : "s"}?\n\nThis permanently removes ${n === 1 ? "it" : "them"} and cannot be undone.`)) return;
+    if (!await ConfettiDialog.confirm({ title: `Delete ${n} photo${n === 1 ? "" : "s"}?`, body: `This permanently removes ${n === 1 ? "it" : "them"} from your gallery. It can't be undone.`, ok: "Delete", danger: true })) return;
 
     deleteAllBtn.disabled = true;
     deleteAllBtn.textContent = "Deleting…";
@@ -580,7 +587,7 @@
     updateSelectionUI();
     if (allPhotos.length) rebuildGalleryFromState();
     else { renderGallery([]); statsLabel.textContent = "0 photos"; }
-    if (failed) alert(`${failed} photo${failed === 1 ? "" : "s"} could not be deleted. Please try again.`);
+    if (failed) ConfettiDialog.alert({ title: "Some photos weren't deleted", body: `${failed} photo${failed === 1 ? "" : "s"} could not be deleted. Please try again.` });
   }
 
   // ── Delete all photos ───────────────────────────────────────────────────
@@ -589,9 +596,9 @@
   deleteAllBtn.addEventListener("click", async () => {
     if (selected.size) return deleteSelected();
     const total = allPhotos.length;
-    if (total === 0) { alert("There are no photos to delete."); return; }
-    if (!confirm(`Delete ALL ${total} photo${total === 1 ? "" : "s"}?\n\nThis permanently removes every photo and video in the gallery and cannot be undone.`)) return;
-    if (!confirm("Are you absolutely sure? This is your last chance to cancel.")) return;
+    if (total === 0) { ConfettiDialog.alert({ title: "Nothing to delete", body: "Your gallery has no photos yet." }); return; }
+    if (!await ConfettiDialog.confirm({ title: `Delete all ${total} photo${total === 1 ? "" : "s"}?`, body: "Every photo and video in your gallery will be removed. Make sure your download has finished first.", ok: "Continue", danger: true })) return;
+    if (!await ConfettiDialog.confirm({ title: "Are you sure?", body: "This can't be undone. Your gallery will be empty, but it stays open for new photos.", ok: "Yes, delete everything", danger: true })) return;
 
     deleteAllBtn.disabled = true;
     deleteAllBtn.textContent = "Deleting…";
@@ -610,9 +617,9 @@
       renderGallery([]);
       statsLabel.textContent = "0 photos";
       const n = data.deleted ?? total;
-      alert(`Deleted ${n} item${n === 1 ? "" : "s"}. The gallery is now empty.`);
+      ConfettiDialog.alert({ title: "Gallery cleared", body: `${n} item${n === 1 ? " was" : "s were"} deleted. Your gallery is now empty.` });
     } catch (err) {
-      alert("Could not delete all photos. Please try again.");
+      ConfettiDialog.alert({ title: "Something went wrong", body: "We couldn't delete the photos. Please try again." });
       console.error(err);
     } finally {
       deleteAllBtn.disabled = false;
@@ -677,7 +684,7 @@
     if (!photo) return;
 
     const who = photo.guest.replace(/_/g, " ");
-    if (!confirm(`Delete this photo from ${who}?\n\nThis permanently removes it and cannot be undone.`)) return;
+    if (!await ConfettiDialog.confirm({ title: "Delete this photo?", body: `This removes ${who}'s photo from your gallery. It can't be undone.`, ok: "Delete", danger: true })) return;
 
     lbDelete.disabled = true;
     lbDelete.textContent = "Deleting…";
@@ -703,7 +710,7 @@
         rebuildGalleryFromState();
       }
     } catch (err) {
-      alert("Could not delete the photo. Please try again.");
+      ConfettiDialog.alert({ title: "Something went wrong", body: "We couldn't delete the photo. Please try again." });
       console.error(err);
     } finally {
       lbDelete.disabled = false;
