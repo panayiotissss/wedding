@@ -8,7 +8,7 @@ R2 under a per-event prefix (see storage.py), so the DB only holds metadata.
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, DateTime, Integer, String, create_engine, text
+from sqlalchemy import Boolean, DateTime, Integer, String, Text, create_engine, text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
 
 import config
@@ -100,6 +100,10 @@ class Invitation(Base):
     extra2_label: Mapped[str] = mapped_column(String(40), default="")
     extra2_text: Mapped[str] = mapped_column(String(120), default="")
     font: Mapped[str] = mapped_column(String(20), default="classic")
+    # "film": one of the opening films with the card written on it.
+    # "site": a scrolling wedding website made of the couple's own sections.
+    kind: Mapped[str] = mapped_column(String(10), default="film")
+    sections: Mapped[str] = mapped_column(Text, default="[]")       # JSON list, kind == "site"
     message: Mapped[str] = mapped_column(String(600), default="")
     rsvp_by: Mapped[str] = mapped_column(String(10), default="")    # YYYY-MM-DD
     theme: Mapped[str] = mapped_column(String(20), default="envelope")
@@ -183,6 +187,8 @@ INVITATION_ADDED_COLUMNS = [
     "extra2_label VARCHAR(40) DEFAULT ''",
     "extra2_text VARCHAR(120) DEFAULT ''",
     "font VARCHAR(20) DEFAULT 'classic'",
+    "kind VARCHAR(10) DEFAULT 'film'",
+    "sections TEXT DEFAULT '[]'",
 ]
 
 

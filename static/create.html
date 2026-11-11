@@ -55,40 +55,40 @@
 </header>
 
 <main class="narrow">
-  <div class="stepper"><span class="on">1 · Your details</span><span>2 · Payment</span><span>3 · You're set</span></div>
+  
   <div class="card">
     <h1 class="page-title">Get started</h1>
-    <p class="page-sub">Takes about a minute.</p>
+    <p class="page-sub">Pay once. No subscription.</p>
     <form id="form" novalidate>
       <div class="plans" role="radiogroup" aria-label="What would you like?">
-        <button type="button" class="plan" role="radio" data-plan="photos" aria-checked="true"><span class="dot"></span>
-          <span><b>Photo gallery</b><small>Guests scan a QR code and their photos land in one private gallery.</small></span><span class="price">€25</span></button>
+        <button type="button" class="plan" role="radio" data-plan="photos" aria-checked="false"><span class="dot"></span>
+          <span><b>Photo gallery</b><small>QR code and private gallery</small></span><span class="price">€25</span></button>
         <button type="button" class="plan" role="radio" data-plan="invite" aria-checked="false"><span class="dot"></span>
-          <span><b>Invitation + RSVP</b><small>An animated envelope invitation. Guests reply in one tap.</small></span><span class="price">€20</span></button>
-        <button type="button" class="plan" role="radio" data-plan="bundle" aria-checked="false"><span class="tag">SAVE €6</span><span class="dot"></span>
-          <span><b>Both</b><small>The invitation before the wedding, the photo gallery on the day.</small></span><span class="price">€39</span></button>
+          <span><b>Invitation + RSVP</b><small>Film or website, with replies</small></span><span class="price">€20</span></button>
+        <button type="button" class="plan" role="radio" data-plan="bundle" aria-checked="true"><span class="tag">SAVE €6</span><span class="dot"></span>
+          <span><b>Both</b><small>Invitation and photo gallery</small></span><span class="price">€39</span></button>
       </div>
       <div class="field-row">
         <div class="field">
-          <label class="label" for="name1">Your name <span class="req">*</span></label>
+          <label class="label" for="name1">Your name</label>
           <input class="input" type="text" id="name1" placeholder="Sofia" autocomplete="given-name" required />
         </div>
         <div class="field">
-          <label class="label" for="name2">Partner's name <span class="req">*</span></label>
+          <label class="label" for="name2">Partner's name</label>
           <input class="input" type="text" id="name2" placeholder="Daniel" autocomplete="off" required />
         </div>
       </div>
       <div class="preview-name" id="previewName" aria-live="polite"></div>
 
       <div class="field">
-        <label class="label" for="email">Email <span class="req">*</span></label>
+        <label class="label" for="email">Email</label>
         <input class="input" type="email" id="email" placeholder="you@example.com" autocomplete="email" inputmode="email" required />
         <p class="suggest" id="suggest">Did you mean <button type="button" id="suggestBtn"></button>?</p>
-        <p class="hint">You'll log in with this, and Stripe sends your receipt here.</p>
+
       </div>
 
       <div class="field">
-        <label class="label" for="password">Password <span class="req">*</span></label>
+        <label class="label" for="password">Password</label>
         <div class="pw-wrap">
           <input class="input" type="password" id="password" placeholder="At least 8 characters" autocomplete="new-password" required />
           <button type="button" class="pw-toggle" id="pwToggle">Show</button>
@@ -97,7 +97,7 @@
         <ul class="rules">
           <li id="rLen">8+ characters</li><li id="rLetter">A letter</li><li id="rNum">A number</li>
         </ul>
-        <p class="hint">You'll log in with your email and this password.</p>
+
       </div>
 
       <div class="field" id="codeField">
@@ -106,15 +106,9 @@
       </div>
       <p style="text-align:right; margin:-.4rem 0 .25rem"><button type="button" class="link-btn" id="codeToggle">Have an access code?</button></p>
 
-      <div class="summary" id="summary">
-        <span id="summaryLabel">Photo gallery · 12 months</span>
-        <strong id="summaryPrice">€25</strong>
-      </div>
+      <button class="btn btn-lg btn-block" id="submitBtn" type="submit" style="margin-top:.75rem">Continue</button>
 
-      <button class="btn btn-lg btn-block" id="submitBtn" type="submit">Continue to payment</button>
-      <p class="hint" style="text-align:center;margin-top:.6rem"><span class="req">*</span> Required</p>
       <p class="hint" style="text-align:center">By continuing you agree to our <a href="/terms" target="_blank">Terms</a> and <a href="/privacy" target="_blank">Privacy Policy</a>.</p>
-      <div class="trust"><span>One-time payment</span><span>Secure checkout by Stripe</span></div>
       <div class="alert alert-error" id="error" role="alert"></div>
     </form>
   </div>
@@ -130,7 +124,7 @@
   function showError(msg) { errorEl.innerHTML = msg; errorEl.classList.add("show"); }
   function hideError() { errorEl.classList.remove("show"); }
 
-  function idleLabel() { return codeEl.value.trim() ? "Create my account" : "Continue to payment"; }
+  function idleLabel() { return codeEl.value.trim() ? "Create my account" : `Continue · ${PLAN_INFO[plan][1]}`; }
 
   // Photos, invitation or both (?plan=invite|bundle preselects).
   const PLAN_INFO = {
@@ -139,12 +133,11 @@
     bundle: ["Invitation + photo gallery", "€39"],
   };
   let plan = new URLSearchParams(location.search).get("plan");
-  if (!PLAN_INFO[plan]) plan = "photos";
+  if (!PLAN_INFO[plan]) plan = "bundle";
   function setPlan(p) {
     plan = p;
     document.querySelectorAll(".plan").forEach((b) => b.setAttribute("aria-checked", String(b.dataset.plan === p)));
-    $("summaryLabel").textContent = PLAN_INFO[p][0];
-    $("summaryPrice").textContent = PLAN_INFO[p][1];
+    btn.textContent = idleLabel();
   }
   document.querySelectorAll(".plan").forEach((b) => b.addEventListener("click", () => setPlan(b.dataset.plan)));
   setPlan(plan);

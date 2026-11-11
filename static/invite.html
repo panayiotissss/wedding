@@ -97,11 +97,8 @@
 <div class="backdrop"></div>
 
 <div class="stage" id="stage" hidden>
-  <video id="vid" muted playsinline preload="auto" poster="/static/invite/envelope-start.jpg">
-    <source src="/static/invite/envelope.webm" type="video/webm" />
-    <source src="/static/invite/envelope.mp4" type="video/mp4" />
-  </video>
-  <img class="still" id="still" src="/static/invite/envelope-end.jpg" alt="" />
+  <video id="vid" muted playsinline preload="auto" poster="/static/invite/envelope-start.jpg"></video>
+  <img class="still" id="still" alt="" />
 
   <div class="card-host" id="cardHost" aria-live="polite"></div>
 
@@ -169,6 +166,7 @@
 
 <script src="/static/confetti.js"></script>
 <script src="/static/invite/card.js"></script>
+<script src="/static/invite/films.js"></script>
 <script>
 "use strict";
 (async function () {
@@ -177,7 +175,6 @@
   // The opening and the writing ARE the invitation, so they always play, even when
   // the computer asks for fewer animations (Windows/Mac setting).
   const reduce = false;
-  const CARD_AT = 7.6;  // seconds: the card has settled in the video by now
 
   let inv;
   try {
@@ -185,6 +182,17 @@
     if (!r.ok) throw 0;
     inv = await r.json();
   } catch { $("missing").hidden = false; return; }
+
+  // The chosen film: its files and where the blank card sits in its last frame.
+  const film = ConfettiFilm(inv.theme);
+  const CARD_AT = film.cardAt;
+  const v = $("vid");
+  v.poster = film.start;
+  v.innerHTML = `<source src="${film.webm}" type="video/webm" /><source src="${film.mp4}" type="video/mp4" />`;
+  v.load();
+  $("still").src = film.end;
+  Object.assign($("cardHost").style, { left: film.card.left * 100 + "%", width: film.card.width * 100 + "%",
+    top: film.card.top * 100 + "%", height: film.card.height * 100 + "%" });
 
   const fmtDate = ConfettiCard.fmtDate;
   const dateLine = [fmtDate(inv.date), inv.time].filter(Boolean).join(" · ");

@@ -624,3 +624,53 @@ def test_new_pages_load(client):
     for path in ["/e/abc/invite", "/i/abc", "/e/abc/home", "/static/invite/envelope.mp4", "/static/invite/card.js"]:
         assert client.get(path).status_code == 200, path
     assert client.get("/e/nope/invite-qr.png").status_code == 404
+
+
+def test_website_invitation_sections_are_cleaned_and_rendered(client, signup):
+    slug = _account(signup, "invite")["slug"]
+    ev = _event(slug)
+    photo = client.post(f"/api/e/{slug}/invitation/photo-url", json={"content_type": "image/jpeg", "file_size": 1000}).json()
+    assert photo["key"].startswith(f"staging/events/{ev.storage_prefix}/invite/") and photo["url"].startswith("https://")
+    body = {**_INVITE, "kind": "site", "theme": "noir", "sections": [
+        {"id": "a1", "type": "text", "title": "Our story", "body": "We met in Paphos", "evil": "<script>"},
+        {"id": "a2", "type": "event", "title": "Ceremony", "time": "17:00", "place": "Church", "map_url": "https://maps.example/1"},
+        {"id": "a3", "type": "photo", "key": photo["key"], "caption": "Us"},
+        {"id": "a4", "type": "photo", "key": "staging/events/someone-else/photos/x.jpg"},
+        {"id": "a5", "type": "gift", "iban": "CY00"},
+        {"type": "qa", "question": "Parking?", "answer": "Yes"},
+    ]}
+    saved = client.put(f"/api/e/{slug}/invitation", json=body).json()
+    types = [s["type"] for s in saved["sections"]]
+    assert types == ["text", "event", "photo", "photo", "qa"]          # unknown "gift" dropped
+    assert "evil" not in saved["sections"][0]
+    assert saved["sections"][2]["url"].startswith("https://")           # own photo gets a link
+    assert saved["sections"][3]["key"] == ""                            # someone else's photo refused
+    assert saved["sections"][4]["id"]                                   # missing id is filled in
+    assert saved["kind"] == "site" and saved["theme"] == "noir"
+
+    page = client.get(f"/i/{slug}").text
+    assert "Confetti website invitation" in page and "__OG_" not in page
+    pub = client.get(f"/api/i/{slug}").json()
+    assert pub["sections"][0]["title"] == "Our story"
+
+
+def test_website_invitation_validation(client, signup):
+    slug = _account(signup, "invite")["slug"]
+    bad_map = {**_INVITE, "kind": "site", "sections": [{"type": "event", "map_url": "javascript:x"}]}
+    assert client.put(f"/api/e/{slug}/invitation", json=bad_map).status_code == 422
+    bad_time = {**_INVITE, "kind": "site", "sections": [{"type": "event", "time": "5pm"}]}
+    assert client.put(f"/api/e/{slug}/invitation", json=bad_time).status_code == 422
+    # A film theme with kind=site falls back to the first website design, and the other way round.
+    assert client.put(f"/api/e/{slug}/invitation", json={**_INVITE, "kind": "site", "theme": "envelope"}).json()["theme"] == "linen"
+    assert client.put(f"/api/e/{slug}/invitation", json={**_INVITE, "kind": "film", "theme": "noir"}).json()["theme"] == "envelope"
+    many = {**_INVITE, "kind": "site", "sections": [{"type": "text", "title": str(i)} for i in range(50)]}
+    assert len(client.put(f"/api/e/{slug}/invitation", json=many).json()["sections"]) == 30
+    assert client.post(f"/api/e/{slug}/invitation/photo-url", json={"content_type": "image/gif", "file_size": 10}).status_code == 400
+    assert client.post(f"/api/e/{slug}/invitation/photo-url", json={"content_type": "image/png", "file_size": 99_000_000}).status_code == 400
+
+
+def test_agent_and_search_files(client):
+    assert "Disallow: /api/" in client.get("/robots.txt").text
+    assert "<loc>http://testserver/create</loc>" in client.get("/sitemap.xml").text
+    llms = client.get("/llms.txt").text
+    assert "EUR 20" in llms and "/create?plan=bundle" in llms

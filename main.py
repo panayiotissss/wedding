@@ -16,6 +16,7 @@ Onboarding is self-serve + pay:
 import asyncio
 import hashlib
 import io
+import json
 import logging
 import re
 import secrets
@@ -28,7 +29,7 @@ from pathlib import Path
 from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Request, Response
 from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, field_validator, model_validator
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 from starlette.middleware.sessions import SessionMiddleware
@@ -200,6 +201,49 @@ def landing_page(request: Request, ref: str | None = None):
     if ref and REF_RE.match(ref):
         request.session["ref"] = ref
     return FileResponse("static/landing.html")
+
+
+# For search engines and AI agents: what's public, what the product is, where to start.
+_PUBLIC_PAGES = ["/", "/create", "/login", "/terms", "/privacy"]
+
+
+@app.get("/robots.txt", include_in_schema=False)
+def robots_txt():
+    base = config.PUBLIC_BASE_URL
+    body = ("User-agent: *\nAllow: /\nDisallow: /api/\nDisallow: /e/\nDisallow: /i/\nDisallow: /admin\n"
+            f"Sitemap: {base}/sitemap.xml\n")
+    return Response(body, media_type="text/plain")
+
+
+@app.get("/sitemap.xml", include_in_schema=False)
+def sitemap_xml():
+    base = config.PUBLIC_BASE_URL
+    urls = "".join(f"<url><loc>{base}{p}</loc></url>" for p in _PUBLIC_PAGES)
+    return Response('<?xml version="1.0" encoding="UTF-8"?>'
+                    f'<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">{urls}</urlset>',
+                    media_type="application/xml")
+
+
+@app.get("/llms.txt", include_in_schema=False)
+def llms_txt():
+    base = config.PUBLIC_BASE_URL
+    body = f"""# Confetti
+
+> Wedding invitations with RSVP, and a QR code that collects every guest's photos into one private gallery. One-time prices, no subscription, no app for guests.
+
+## Products
+- Invitation + RSVP, EUR 20: an animated invitation (a film or a scrolling website) sent as one link; guests reply in one tap; the couple sees a live list and can export CSV.
+- Photo gallery, EUR 25: one QR code; guests upload full-quality photos and videos from their phone browser; only the couple can view; live for 12 months.
+- Both, EUR 39.
+
+## Start
+- Sign up: {base}/create?plan=invite | {base}/create?plan=photos | {base}/create?plan=bundle
+- Log in: {base}/login
+- Terms: {base}/terms
+- Privacy: {base}/privacy
+- Support: support@confettiwedding.net
+"""
+    return Response(body, media_type="text/plain")
 
 
 @app.get("/favicon.ico", include_in_schema=False)
@@ -1011,14 +1055,62 @@ def admin_page():
 # the couple's choosing), then they RSVP. Any couple can design and preview
 # it; the guest link works once the account has the invitation add-on.
 
-INVITE_THEMES = {"envelope"}
+# Films: the opening videos (static/invite/films.js has their files and card position).
+# Sites: the scrolling website designs (static/invite/site.html).
+FILM_THEMES = {"envelope", "film2", "film3"}
+SITE_THEMES = {"linen", "garden", "noir"}
+INVITE_THEMES = FILM_THEMES | SITE_THEMES
+MAX_SECTIONS = 30
+MAX_INVITE_PHOTO = 15 * 1024 * 1024
+INVITE_PHOTO_TYPES = {"image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp"}
+# Fields each website section may have, with their max lengths.
+SECTION_FIELDS = {
+    "text":      {"title": 80, "body": 1500},
+    "event":     {"title": 80, "time": 5, "place": 120, "map_url": 500},
+    "photo":     {"key": 300, "caption": 120},
+    "countdown": {"title": 80},
+    "qa":        {"question": 160, "answer": 800},
+}
 INVITE_FONTS = {"classic", "romantic", "calligraphy", "modern", "timeless"}
 MAX_RSVPS = 1000
 _DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 _TIME_RE = re.compile(r"^\d{2}:\d{2}$")
 _INVITE_FIELDS = ("names", "date", "time", "venue", "map_url", "reception", "reception_map",
                   "extra1_label", "extra1_text", "extra2_label", "extra2_text",
-                  "message", "rsvp_by", "theme", "font")
+                  "message", "rsvp_by", "theme", "font", "kind")
+
+
+def _invite_photo_prefix(ev: Event) -> str:
+    return storage.event_root(_storage_key(ev)) + "invite/"
+
+
+def _load_sections(inv: Invitation | None) -> list:
+    try:
+        data = json.loads(inv.sections or "[]") if inv else []
+        return data if isinstance(data, list) else []
+    except ValueError:
+        return []
+
+
+def _clean_sections(raw: list, photo_prefix: str) -> list:
+    """Keep only known section types and fields, trimmed to their limits."""
+    out = []
+    for item in raw[:MAX_SECTIONS]:
+        if not isinstance(item, dict) or item.get("type") not in SECTION_FIELDS:
+            continue
+        sec = {"id": re.sub(r"[^A-Za-z0-9_-]", "", str(item.get("id", "")))[:16] or secrets.token_hex(4),
+               "type": item["type"]}
+        for field, limit in SECTION_FIELDS[item["type"]].items():
+            value = str(item.get(field) or "").strip()[:limit]
+            if field == "map_url" and value:
+                value = _url(value)
+            if field == "time" and value and not _TIME_RE.match(value):
+                raise ValueError("Use a time like 18:30.")
+            if field == "key" and value and not value.startswith(photo_prefix):
+                value = ""  # only photos uploaded to this couple's own folder
+            sec[field] = value
+        out.append(sec)
+    return out
 
 
 def _get_invitation(db: Session, ev: Event) -> Invitation | None:
@@ -1033,8 +1125,18 @@ def _invitation_json(ev: Event, inv: Invitation | None) -> dict:
     """The invitation's fields; defaults (names from the account) when there's none yet."""
     data = {f: (getattr(inv, f) or "") if inv else "" for f in _INVITE_FIELDS}
     data["names"] = data["names"] or ev.couple_names or ""
-    data["theme"] = data["theme"] or "envelope"
+    data["kind"] = data["kind"] if data["kind"] in ("film", "site") else "film"
+    data["theme"] = data["theme"] or ("linen" if data["kind"] == "site" else "envelope")
     data["font"] = data["font"] or "classic"
+    data["sections"] = _load_sections(inv)
+    return data
+
+
+def _with_photo_urls(data: dict) -> dict:
+    """Photo sections get a temporary link the browser can load."""
+    for sec in data["sections"]:
+        if sec.get("type") == "photo" and sec.get("key"):
+            sec["url"] = storage.presign_get(sec["key"], expires=6 * 3600)
     return data
 
 
@@ -1065,6 +1167,8 @@ class InvitationRequest(BaseModel):
     rsvp_by: str = ""
     theme: str = "envelope"
     font: str = "classic"
+    kind: str = "film"
+    sections: list = []
 
     @field_validator("names")
     @classmethod
@@ -1110,10 +1214,17 @@ class InvitationRequest(BaseModel):
     def v_message(cls, v: str) -> str:
         return v.strip()[:600]
 
-    @field_validator("theme")
+    @field_validator("kind")
     @classmethod
-    def v_theme(cls, v: str) -> str:
-        return v if v in INVITE_THEMES else "envelope"
+    def v_kind(cls, v: str) -> str:
+        return v if v in ("film", "site") else "film"
+
+    @model_validator(mode="after")
+    def v_theme_matches_kind(self):
+        allowed = SITE_THEMES if self.kind == "site" else FILM_THEMES
+        if self.theme not in allowed:
+            self.theme = "linen" if self.kind == "site" else "envelope"
+        return self
 
     @field_validator("font")
     @classmethod
@@ -1127,6 +1238,7 @@ def invitation_editor_page(slug: str):
 
 
 _INVITE_HTML = Path("static/invite.html")
+_SITE_HTML = Path("static/site.html")
 
 
 @app.get("/i/{slug}")
@@ -1140,7 +1252,8 @@ def invitation_guest_page(slug: str, db: Session = Depends(get_db)):
         desc = "Tap to open your invitation and reply."
     else:
         title, desc = "You're invited", "A wedding invitation made with Confetti."
-    page = (_INVITE_HTML.read_text(encoding="utf-8")
+    template = _SITE_HTML if inv and inv.kind == "site" else _INVITE_HTML
+    page = (template.read_text(encoding="utf-8")
             .replace("__OG_TITLE__", escape(title))
             .replace("__OG_DESC__", escape(desc))
             .replace("__OG_IMAGE__", escape(f"{config.PUBLIC_BASE_URL}/static/invite/envelope-start.jpg")))
@@ -1152,7 +1265,7 @@ def get_invitation(slug: str, request: Request, db: Session = Depends(get_db)):
     require_event_auth(request, slug)
     ev = get_event_or_404(db, slug)
     inv = _get_invitation(db, ev)
-    data = _invitation_json(ev, inv)
+    data = _with_photo_urls(_invitation_json(ev, inv))
     data["saved"] = inv is not None
     data["live"] = _invitation_live(ev, inv)
     data["has_invite"] = bool(ev.invite) and ev.status == "active"
@@ -1169,13 +1282,39 @@ def save_invitation(slug: str, body: InvitationRequest, request: Request, db: Se
     if not inv:
         inv = Invitation(event_id=ev.id)
         db.add(inv)
-    for field, value in body.model_dump().items():
+    data = body.model_dump()
+    try:
+        sections = _clean_sections(data.pop("sections"), _invite_photo_prefix(ev))
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    for field, value in data.items():
         setattr(inv, field, value)
+    inv.sections = json.dumps(sections)
     inv.updated_at = now_utc()
     db.commit()
-    data = _invitation_json(ev, inv)
+    data = _with_photo_urls(_invitation_json(ev, inv))
     data["live"] = _invitation_live(ev, inv)
     return data
+
+
+class InvitePhotoRequest(BaseModel):
+    content_type: str
+    file_size: int
+
+
+@app.post("/api/e/{slug}/invitation/photo-url")
+def invitation_photo_url(slug: str, body: InvitePhotoRequest, request: Request, db: Session = Depends(get_db)):
+    """Signed upload link for a photo on the couple's website invitation."""
+    require_event_auth(request, slug)
+    ev = get_event_or_404(db, slug)
+    ext = INVITE_PHOTO_TYPES.get(body.content_type)
+    if not ext:
+        raise HTTPException(status_code=400, detail="Use a JPG, PNG or WebP photo.")
+    if not 0 < body.file_size <= MAX_INVITE_PHOTO:
+        raise HTTPException(status_code=400, detail="That photo is too large (15 MB max).")
+    key = f"{_invite_photo_prefix(ev)}{uuid.uuid4().hex}{ext}"
+    return {"url": storage.presign_put(key, body.content_type), "key": key,
+            "preview_url": storage.presign_get(key, expires=6 * 3600)}
 
 
 @app.get("/e/{slug}/invite-qr.png")
@@ -1198,7 +1337,7 @@ def public_invitation(slug: str, request: Request, db: Session = Depends(get_db)
     is_couple = bool(ev) and slug in request.session.get("auth_events", [])
     if not inv or not (live or is_couple):
         raise HTTPException(status_code=404, detail="Invitation not found")
-    data = _invitation_json(ev, inv)
+    data = _with_photo_urls(_invitation_json(ev, inv))
     data["preview"] = not live
     data["upload_url"] = f"/e/{ev.slug}" if ev.status == "active" and ev.photos else None
     return data
