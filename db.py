@@ -41,6 +41,9 @@ class Event(Base):
     storage_prefix: Mapped[str | None] = mapped_column(String(120), nullable=True)
 
     # pending_payment → active
+    # Slug of the gallery whose guest page brought this couple (WED-23), if any.
+    referred_by: Mapped[str | None] = mapped_column(String(16), nullable=True)
+
     status: Mapped[str] = mapped_column(String(20), default="pending_payment")
     stripe_ref: Mapped[str | None] = mapped_column(String(120), nullable=True)
 
@@ -85,6 +88,14 @@ engine = create_engine(_url, pool_pre_ping=True, connect_args=_connect_args)
 SessionLocal = sessionmaker(bind=engine, expire_on_commit=False)
 
 
+# Columns added after the table first existed. create_all() never adds
+# columns to an existing table, so Postgres gets them here (idempotent).
+ADDED_COLUMNS = [
+    "storage_prefix VARCHAR(120)",
+    "referred_by VARCHAR(16)",
+]
+
+
 def init_db() -> None:
     """Create tables if they don't exist (fine for a POC — swap to Alembic later)."""
     Base.metadata.create_all(engine)
@@ -92,9 +103,8 @@ def init_db() -> None:
     # (create_all() only creates missing tables, never missing columns.)
     if _url.startswith("postgresql"):
         with engine.begin() as conn:
-            conn.execute(
-                text("ALTER TABLE events ADD COLUMN IF NOT EXISTS storage_prefix VARCHAR(120)")
-            )
+            for col in ADDED_COLUMNS:
+                conn.execute(text(f"ALTER TABLE events ADD COLUMN IF NOT EXISTS {col}"))
 
 
 def get_db():

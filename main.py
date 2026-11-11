@@ -145,6 +145,13 @@ def _activate(ev: Event) -> None:
     ev.expires_at = ev.paid_at + timedelta(days=config.EVENT_TTL_DAYS)
 
 
+def _referrer(db: Session, ref: str | None) -> str | None:
+    """The referring gallery's slug, only if it really exists."""
+    if ref and db.query(Event.id).filter(Event.slug == ref).first():
+        return ref
+    return None
+
+
 def _send_welcome(ev: Event) -> None:
     """Welcome email with the gallery link and QR code (runs after the response)."""
     if ev.contact_email:
@@ -174,8 +181,14 @@ def _unique_slug(db: Session) -> str:
 # Page routes (serve static HTML shells; the JS reads the slug from the URL)
 # ---------------------------------------------------------------------------
 
+REF_RE = re.compile(r"^[a-z0-9]{4,16}$")
+
+
 @app.get("/")
-def landing_page():
+def landing_page(request: Request, ref: str | None = None):
+    # WED-23: remember which gallery's guest page sent this visitor.
+    if ref and REF_RE.match(ref):
+        request.session["ref"] = ref
     return FileResponse("static/landing.html")
 
 
@@ -311,6 +324,7 @@ def create_event(body: CreateEventRequest, request: Request, background: Backgro
             # Readable R2 folder: couple name + slug (slug guarantees uniqueness,
             # since two different couples can share the same names).
             storage_prefix=f"{slugify_names(body.couple_names)}-{slug}",
+            referred_by=_referrer(db, request.session.get("ref")),
         )
 
     if config.PAYMENTS_ENABLED and not code_ok:

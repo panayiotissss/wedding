@@ -343,3 +343,20 @@ def test_cleanup_deletes_expired_and_old_unpaid_only(client, signup, monkeypatch
     assert _event(keep_paid) and _event(keep_unpaid)
     assert _event(old_paid) is None and _event(old_unpaid) is None
     assert all(p.startswith("staging/events/") for p in wiped) and len(wiped) == 2
+
+
+# ── WED-23: couples who came from a guest page ─────────────────────────────
+
+def test_signup_records_the_referring_gallery(client, signup):
+    origin = signup(access_code="FREE-TEST", email="first@example.com").json()["slug"]
+    client.cookies.clear()                       # a different visitor (a guest)
+    assert client.get(f"/?ref={origin}").status_code == 200
+    slug = signup(access_code="FREE-TEST", email="guest@example.com").json()["slug"]
+    assert _event(slug).referred_by == origin
+
+
+def test_unknown_or_bad_ref_is_ignored(client, signup):
+    client.get("/?ref=doesnotexist")
+    slug = signup(access_code="FREE-TEST").json()["slug"]
+    assert _event(slug).referred_by is None
+    assert client.get("/?ref=<script>").status_code == 200
