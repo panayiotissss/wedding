@@ -95,6 +95,18 @@ app.add_middleware(
     same_site="lax",
 )
 
+# Pages that must never show up in search results: couples' accounts, guest
+# pages and invitations (private by nature), payment and password screens.
+_PRIVATE_PREFIXES = ("/e/", "/i/", "/api/", "/adminP", "/create/success", "/forgot", "/reset", "/static/site.html")
+
+
+@app.middleware("http")
+async def search_engine_rules(request: Request, call_next):
+    response = await call_next(request)
+    if not config.SEARCH_INDEXING or request.url.path.startswith(_PRIVATE_PREFIXES):
+        response.headers["X-Robots-Tag"] = "noindex, nofollow"
+    return response
+
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -211,8 +223,11 @@ _PUBLIC_PAGES = ["/", "/create", "/login", "/terms", "/privacy",
 @app.get("/robots.txt", include_in_schema=False)
 def robots_txt():
     base = config.PUBLIC_BASE_URL
-    body = ("User-agent: *\nAllow: /\nDisallow: /api/\nDisallow: /e/\nDisallow: /i/\n"
-            f"Sitemap: {base}/sitemap.xml\n")
+    if not config.SEARCH_INDEXING:   # staging, local: stay out of search results entirely
+        return Response("User-agent: *\nDisallow: /\n", media_type="text/plain")
+    # Private pages are not blocked here on purpose: crawlers must be able to
+    # read their noindex header (see search_engine_rules) for it to work.
+    body = f"User-agent: *\nAllow: /\nDisallow: /api/\nSitemap: {base}/sitemap.xml\n"
     return Response(body, media_type="text/plain")
 
 
@@ -1282,7 +1297,9 @@ def _site_page(title: str, desc: str, theme: str) -> Response:
 @app.get("/demo/{design}")
 def design_demo(design: str):
     """A sample couple in any design: for the landing page and for couples choosing."""
-    return _site_page("Confetti · Wedding website invitation", "A sample invitation made with Confetti.", design)
+    label = design.capitalize() if design in SITE_THEMES else "Linen"
+    return _site_page(f"{label} · Animated wedding invitation by Confetti",
+                      f"See the {label} design live: an animated wedding invitation guests scroll through and reply to in a single tap.", design)
 
 
 @app.get("/i/{slug}")

@@ -7,8 +7,14 @@
   <meta name="description" content="A wedding invitation your guests scroll through and reply to in a single tap. Five designs, edit anytime, pay once from €20." />
   <meta property="og:title" content="Confetti · Wedding invitations that move" />
   <meta property="og:description" content="A wedding invitation your guests scroll through and reply to in a single tap." />
-  <meta property="og:image" content="https://confettiwedding.net/static/invite/og-linen.jpg" />
+  <meta property="og:image" content="https://confettiwedding.net/static/og-home.jpg" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:url" content="https://confettiwedding.net/" />
+  <meta property="og:site_name" content="Confetti" />
   <meta property="og:type" content="website" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <link rel="canonical" href="https://confettiwedding.net/" />
   <meta name="theme-color" content="#22332B" />
   <link rel="icon" href="/static/favicon.svg" type="image/svg+xml" />
   <link rel="apple-touch-icon" href="/static/logo-512.png" />
@@ -18,14 +24,24 @@
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
-    "@type": "Product",
-    "name": "Confetti",
-    "description": "Animated wedding invitations with RSVP in five designs, and a QR code that collects every guest's photos into one private gallery.",
-    "brand": { "@type": "Brand", "name": "Confetti" },
-    "offers": [
-      { "@type": "Offer", "name": "Invitation + RSVP", "price": "20.00", "priceCurrency": "EUR", "url": "https://confettiwedding.net/create?plan=invite" },
-      { "@type": "Offer", "name": "Photo gallery", "price": "25.00", "priceCurrency": "EUR", "url": "https://confettiwedding.net/create?plan=photos" },
-      { "@type": "Offer", "name": "Invitation + photo gallery", "price": "39.00", "priceCurrency": "EUR", "url": "https://confettiwedding.net/create?plan=bundle" }
+    "@graph": [
+      { "@type": "Organization", "@id": "https://confettiwedding.net/#org", "name": "Confetti", "url": "https://confettiwedding.net/",
+        "logo": "https://confettiwedding.net/static/logo-512.png", "email": "support@confettiwedding.net",
+        "address": { "@type": "PostalAddress", "addressLocality": "Nicosia", "addressCountry": "CY" } },
+      { "@type": "WebSite", "@id": "https://confettiwedding.net/#site", "name": "Confetti", "url": "https://confettiwedding.net/", "publisher": { "@id": "https://confettiwedding.net/#org" }, "inLanguage": "en" },
+      { "@type": "Product", "name": "Confetti", "brand": { "@id": "https://confettiwedding.net/#org" }, "image": "https://confettiwedding.net/static/og-home.jpg",
+        "description": "Animated wedding invitations with RSVP in five designs, and a QR code that collects every guest's photos into one private gallery.",
+        "offers": [
+          { "@type": "Offer", "name": "Invitation + RSVP", "price": "20.00", "priceCurrency": "EUR", "availability": "https://schema.org/InStock", "url": "https://confettiwedding.net/create?plan=invite" },
+          { "@type": "Offer", "name": "Photo gallery", "price": "25.00", "priceCurrency": "EUR", "availability": "https://schema.org/InStock", "url": "https://confettiwedding.net/create?plan=photos" },
+          { "@type": "Offer", "name": "Invitation + photo gallery", "price": "39.00", "priceCurrency": "EUR", "availability": "https://schema.org/InStock", "url": "https://confettiwedding.net/create?plan=bundle" }
+        ] },
+      { "@type": "FAQPage", "mainEntity": [
+        { "@type": "Question", "name": "Do guests need an app?", "acceptedAnswer": { "@type": "Answer", "text": "No. They tap your link and it opens." } },
+        { "@type": "Question", "name": "Can we see the designs first?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. Every design opens live on the home page." } },
+        { "@type": "Question", "name": "Who sees the photos?", "acceptedAnswer": { "@type": "Answer", "text": "Only you." } },
+        { "@type": "Question", "name": "Can we add the other feature later?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. Add it from your account whenever you like." } }
+      ] }
     ]
   }
   </script>
@@ -69,7 +85,8 @@
     /* Nav */
     .nav { display: flex; align-items: center; height: 68px; }
     .logo { font-family: var(--serif); font-size: 27px; display: flex; align-items: center; gap: 10px; margin-right: auto; }
-    .logo img { width: 26px; height: 26px; border-radius: 7px; }
+    .logo img { width: 28px; height: 28px; border-radius: 7px; }
+    footer .flogo { font-size: 27px; color: var(--ivory); margin-right: auto; }
     .nav a.in { font-size: 15px; color: rgba(243,237,228,.8); padding: 10px 4px 10px 16px; }
     .nav a.in:hover { color: var(--ivory); }
     .nav .btn.login { height: 40px; padding: 0 18px; font-size: 14px; border-radius: 12px; }
@@ -157,7 +174,7 @@
     .end { text-align: center; padding: 110px 0; }
     .end h2 { font-size: clamp(54px, 9vw, 120px); line-height: .92; margin-bottom: 40px; }
     footer { padding: 30px 0 40px; font-size: 14px; color: rgba(243,237,228,.55); background: var(--night); }
-    footer .wrap { display: flex; flex-wrap: wrap; gap: 8px 22px; }
+    footer .wrap { display: flex; flex-wrap: wrap; gap: 8px 22px; align-items: center; }
     footer .wrap span { margin-right: auto; }
     footer a:hover { color: var(--ivory); }
 
@@ -263,15 +280,15 @@
   <section class="end dark" aria-labelledby="end">
     <div class="wrap">
       <h2 id="end" class="rv">Start with <em>your names.</em></h2>
-      <a href="/create?plan=invite" class="btn ivory block-sm" id="endCta">Create your invitation</a>
+      <a href="/create" class="btn block-sm" id="endCta">Get started</a>
     </div>
   </section>
 </main>
 
 <footer>
   <div class="wrap">
-    <span>Confetti</span>
-    <a href="/login">Log in</a><a href="/terms">Terms</a><a href="/privacy">Privacy</a><a href="mailto:support@confettiwedding.net">Support</a>
+    <a href="/" class="logo flogo"><img src="/static/logo.png" alt="" />Confetti</a>
+    <a href="/login" data-account>Log in</a><a href="/terms">Terms</a><a href="/privacy">Privacy</a><a href="mailto:support@confettiwedding.net">Support</a>
   </div>
 </footer>
 

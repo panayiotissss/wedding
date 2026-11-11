@@ -51,6 +51,8 @@ R2_KEY_ROOT          = (_optional("R2_KEY_ROOT", "events") or "events").strip("/
 SESSION_SECRET  = _require("SESSION_SECRET")
 DATABASE_URL    = _require("DATABASE_URL")
 PUBLIC_BASE_URL = (_optional("PUBLIC_BASE_URL", "http://localhost:8000") or "").rstrip("/")
+# Only the real domain may appear in search results; staging and local never.
+SEARCH_INDEXING = PUBLIC_BASE_URL in ("https://confettiwedding.net", "https://www.confettiwedding.net")
 COOKIE_SECURE   = (_optional("COOKIE_SECURE", "true") or "true").lower() != "false"
 
 # ── Business rules ─────────────────────────────────────────────────────────

@@ -290,7 +290,7 @@
     document.body.dataset.theme = theme;
     document.body.style.setProperty("--names", font.names);
     document.body.style.setProperty("--text", font.text);
-    document.title = `${inv.names} · You're invited`;
+    if (!inv.demo) document.title = `${inv.names} · You're invited`;
     renderNames(theme, font);
     const initials = (inv.names || "").split(/\s*(?:&|and|\+)\s*/i).map((n) => n.trim()[0]).filter(Boolean).slice(0, 2);
     $("seal").textContent = initials.join("");

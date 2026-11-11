@@ -675,8 +675,16 @@ def test_website_invitation_validation(client, signup):
     assert client.post(f"/api/e/{slug}/invitation/photo-url", json={"content_type": "image/png", "file_size": 99_000_000}).status_code == 400
 
 
-def test_agent_and_search_files(client):
+def test_agent_and_search_files(client, monkeypatch):
+    # Test server is not the real domain: everything stays out of search results.
+    assert client.get("/robots.txt").text == "User-agent: *\nDisallow: /\n"
+    assert client.get("/").headers["x-robots-tag"] == "noindex, nofollow"
+    monkeypatch.setattr(config, "SEARCH_INDEXING", True)
     assert "Disallow: /api/" in client.get("/robots.txt").text
+    assert "x-robots-tag" not in client.get("/").headers
+    assert client.get("/i/abc").headers["x-robots-tag"] == "noindex, nofollow"
+    assert client.get("/e/abc/gallery").headers["x-robots-tag"] == "noindex, nofollow"
+    assert "Noir · Animated wedding invitation" in client.get("/demo/noir").text
     assert "<loc>http://testserver/create</loc>" in client.get("/sitemap.xml").text
     llms = client.get("/llms.txt").text
     assert "EUR 20" in llms and "/create?plan=bundle" in llms
