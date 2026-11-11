@@ -74,7 +74,11 @@ async def _cleanup_loop():
 def _cleanup_once() -> list[str]:
     db = SessionLocal()
     try:
-        return run_cleanup(db)
+        deleted = run_cleanup(db)
+        freeup = run_freeup(db)
+        if any(freeup.values()):
+            log.info("Storage free-up: %s", freeup)
+        return deleted
     finally:
         db.close()
 
@@ -523,6 +527,10 @@ def get_upload_url(slug: str, body: UploadRequest, db: Session = Depends(get_db)
     if ev.status != "active":
         raise HTTPException(status_code=403, detail="This gallery isn't active yet.")
 
+    if ev.freeup_warned_at or ev.files_freed_at:
+        # New photos arriving means the gallery is in use again (WED-34).
+        ev.freeup_warned_at = ev.files_freed_at = None
+        db.commit()
     key = (
         storage.photos_prefix(_storage_key(ev))
         + f"{sanitize_name(body.guest_name)}/{uuid.uuid4()}-{sanitize_filename(body.filename)}"
@@ -650,6 +658,8 @@ def download_zip(slug: str, request: Request, db: Session = Depends(get_db)):
     existing = storage.head(zip_key)
     if not existing or existing.get("Metadata", {}).get("sig") != sig:
         _build_zip(objects, prefix, zip_key, sig)
+    ev.last_download_at = now_utc()   # WED-34
+    db.commit()
 
     return RedirectResponse(storage.presign_get(zip_key, download_as=ZIP_NAME), status_code=302)
 
@@ -684,7 +694,32 @@ def delete_all_photos(slug: str, request: Request, db: Session = Depends(get_db)
     key = _storage_key(ev)
     deleted = storage.delete_prefix(storage.photos_prefix(key))
     storage.delete_prefix(storage.exports_prefix(key))
+    ev.all_deleted_at = now_utc()   # WED-34
+    ev.freeup_warned_at = None
+    db.commit()
     return {"ok": True, "deleted": deleted}
+
+
+@app.get("/api/e/{slug}/storage")
+def storage_status(slug: str, request: Request, db: Session = Depends(get_db)):
+    """What the gallery page needs to show the free-up banner (couple only)."""
+    ev = get_event_or_404(db, slug)
+    require_event_auth(request, slug)
+    clear_on = None
+    if ev.freeup_warned_at:
+        clear_on = (_aware(ev.freeup_warned_at) + FREEUP_GRACE).date().isoformat()
+    return {"downloaded": ev.last_download_at is not None, "clear_on": clear_on}
+
+
+@app.post("/api/e/{slug}/keep")
+def keep_photos(slug: str, request: Request, db: Session = Depends(get_db)):
+    """Couple chose to keep their photos online: cancel the free-up and restart the clock."""
+    ev = get_event_or_404(db, slug)
+    require_event_auth(request, slug)
+    ev.freeup_warned_at = None
+    ev.last_download_at = now_utc()
+    db.commit()
+    return {"ok": True}
 
 
 # ---------------------------------------------------------------------------
@@ -714,14 +749,95 @@ def run_cleanup(db: Session) -> list[str]:
     return deleted
 
 
+# WED-34: free up storage for galleries the couple has already taken home.
+ZIP_CACHE_TTL = timedelta(days=3)     # the cached "Download all" zip doubles storage
+FREEUP_AFTER = timedelta(days=60)     # downloaded + no new uploads for this long -> warn
+FREEUP_GRACE = timedelta(days=14)     # then clear the photos this long after the warning
+
+
+def run_freeup(db: Session) -> dict:
+    """Daily storage housekeeping; the couple is always warned before photos go."""
+    now = now_utc()
+    zips_cleared, warned, freed = [], [], []
+    candidates = (db.query(Event)
+                  .filter(Event.status == "active", Event.last_download_at.isnot(None), Event.files_freed_at.is_(None))
+                  .all())
+    for ev in candidates:
+        key = _storage_key(ev)
+        downloaded = _aware(ev.last_download_at)
+        if now - downloaded > ZIP_CACHE_TTL and storage.delete_prefix(storage.exports_prefix(key)):
+            zips_cleared.append(ev.slug)
+        photos = storage.list_prefix(storage.photos_prefix(key))
+        if not photos:
+            continue
+        newest = max(_aware(o["LastModified"]) for o in photos)
+        if newest > downloaded:
+            continue   # new photos since the download: the couple hasn't got everything
+        if now - downloaded < FREEUP_AFTER:
+            continue
+        if not ev.freeup_warned_at:
+            ev.freeup_warned_at = now
+            if ev.contact_email:
+                mailer.freeup_warning(ev.contact_email, ev.couple_names,
+                                      f"{config.PUBLIC_BASE_URL}/e/{ev.slug}/gallery",
+                                      (now + FREEUP_GRACE).strftime("%-d %B %Y"))
+            warned.append(ev.slug)
+        elif now - _aware(ev.freeup_warned_at) >= FREEUP_GRACE:
+            storage.delete_prefix(storage.photos_prefix(key))
+            storage.delete_prefix(storage.exports_prefix(key))
+            ev.files_freed_at = now
+            freed.append(ev.slug)
+    db.commit()
+    return {"zips_cleared": zips_cleared, "warned": warned, "freed": freed}
+
+
+def _require_admin(request: Request) -> None:
+    if not config.ADMIN_TOKEN or request.headers.get("x-admin-token") != config.ADMIN_TOKEN:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+
 @app.post("/api/admin/cleanup")
 def cleanup(request: Request, db: Session = Depends(get_db)):
     """Run the cleanup now. It also runs daily on its own (see _cleanup_loop).
     Protected by ADMIN_TOKEN:  curl -X POST -H 'X-Admin-Token: ...' /api/admin/cleanup"""
-    if not config.ADMIN_TOKEN or request.headers.get("x-admin-token") != config.ADMIN_TOKEN:
-        raise HTTPException(status_code=401, detail="Unauthorized")
+    _require_admin(request)
     deleted = run_cleanup(db)
-    return {"deleted": deleted, "count": len(deleted)}
+    return {"deleted": deleted, "count": len(deleted), "freeup": run_freeup(db)}
+
+
+@app.get("/api/admin/report")
+def admin_report(request: Request, db: Session = Depends(get_db)):
+    """Every gallery with its storage use and housekeeping dates (WED-34)."""
+    _require_admin(request)
+    iso = lambda d: _aware(d).isoformat() if d else None
+    rows, total_bytes = [], 0
+    for ev in db.query(Event).order_by(Event.created_at.desc()).all():
+        objs = storage.list_prefix(storage.event_root(_storage_key(ev)))
+        photos = [o for o in objs if "/photos/" in o["Key"]]
+        size = sum(o.get("Size", 0) for o in objs)
+        total_bytes += size
+        rows.append({
+            "slug": ev.slug, "names": ev.couple_names, "email": ev.contact_email, "status": ev.status,
+            "created_at": iso(ev.created_at), "paid_at": iso(ev.paid_at), "expires_at": iso(ev.expires_at),
+            "referred_by": ev.referred_by, "photos": len(photos), "bytes": size,
+            "last_upload": iso(max((o["LastModified"] for o in photos), default=None)),
+            "last_download_at": iso(ev.last_download_at), "all_deleted_at": iso(ev.all_deleted_at),
+            "freeup_warned_at": iso(ev.freeup_warned_at), "files_freed_at": iso(ev.files_freed_at),
+        })
+    return {
+        "totals": {
+            "galleries": len(rows), "active": sum(r["status"] == "active" for r in rows),
+            "paid": sum(1 for r in rows if r["paid_at"]), "from_guests": sum(1 for r in rows if r["referred_by"]),
+            "photos": sum(r["photos"] for r in rows), "bytes": total_bytes,
+            "gb": round(total_bytes / 1e9, 3),
+        },
+        "galleries": rows,
+    }
+
+
+@app.get("/admin")
+def admin_page():
+    return FileResponse("static/admin.html")
 
 
 # ---------------------------------------------------------------------------

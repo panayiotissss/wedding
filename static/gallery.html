@@ -47,6 +47,10 @@
     #clearSel { display: none; }
     body.selecting #clearSel { display: inline-flex; }
 
+    .notice { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .75rem;
+      background: var(--accent-soft); border-radius: var(--radius); padding: .9rem 1.1rem; margin-bottom: 1.25rem; }
+    .notice p { margin: 0; color: var(--ink-soft); font-size: .92rem; flex: 1 1 260px; }
+    .notice b { color: var(--ink); }
     .share-panel {
       display: flex; align-items: center; gap: 1.1rem; background: var(--surface); border: 1px solid var(--line);
       border-radius: var(--radius-lg); padding: 1rem 1.1rem; margin-bottom: 1.5rem; box-shadow: var(--shadow);
@@ -158,6 +162,15 @@
       </div>
     </div>
     <img class="share-qr" id="galleryQr" alt="Guest upload QR code" />
+  </div>
+
+  <div class="notice" id="freeNotice" hidden>
+    <p><b>Got everything?</b> Once your download has finished, you can free up your gallery. Your downloaded copy stays yours.</p>
+    <button class="btn btn-soft btn-sm" id="freeUpBtn" type="button">Free up gallery</button>
+  </div>
+  <div class="notice" id="keepNotice" hidden>
+    <p id="keepText"><b>Your photos will be cleared soon</b> because you downloaded everything.</p>
+    <button class="btn btn-sm" id="keepBtn" type="button">Keep my photos</button>
   </div>
 
   <div id="galleryContent">
@@ -334,7 +347,31 @@
 
   refreshBtn.addEventListener("click", loadPhotos);
 
+  // WED-34: show "Keep my photos" when a free-up is scheduled.
+  async function loadStorageStatus() {
+    try {
+      const st = await (await fetch(`${API}/storage`)).json();
+      if (st.clear_on) {
+        const when = new Date(st.clear_on + "T12:00:00").toLocaleDateString(undefined, { day: "numeric", month: "long", year: "numeric" });
+        document.getElementById("keepText").innerHTML =
+          `<b>Your photos will be cleared on ${when}</b> because you downloaded everything and no new photos have arrived.`;
+        document.getElementById("keepNotice").hidden = false;
+      }
+    } catch { /* not critical */ }
+  }
+  document.getElementById("keepBtn").addEventListener("click", async () => {
+    const r = await fetch(`${API}/keep`, { method: "POST" });
+    if (r.ok) document.getElementById("keepText").innerHTML = "<b>Done.</b> Your photos stay online.";
+    document.getElementById("keepBtn").hidden = true;
+  });
+  document.getElementById("freeUpBtn").addEventListener("click", () => {
+    document.getElementById("freeNotice").hidden = true;
+    clearSelection();
+    deleteAllBtn.click();
+  });
+
   async function loadPhotos() {
+    loadStorageStatus();
     galleryContent.innerHTML = '<div class="state-msg"><div class="spinner"></div>Loading photos…</div>';
     statsLabel.textContent = "Loading…";
     allPhotos = [];
@@ -473,6 +510,7 @@
     document.body.removeChild(a);
 
     downloadBtn.textContent = "Preparing…";
+    setTimeout(() => { document.getElementById("freeNotice").hidden = false; }, 4000);
     // Reset after a few seconds (the download will start in background)
     setTimeout(() => { downloadBtn.textContent = "Download all"; }, 5000);
   });

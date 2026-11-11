@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex" />
+  <title>Admin · Confetti</title>
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/app.css" />
+  <style>
+    main { max-width: 1200px; margin: 0 auto; padding: 1rem 1.25rem 4rem; }
+    h1 { font-family: var(--serif); font-size: 2.2rem; font-weight: 600; margin: .5rem 0 1rem; }
+    .login { display: flex; flex-wrap: wrap; gap: .6rem; align-items: center; margin-bottom: 1.5rem; }
+    .login .input { max-width: 360px; }
+    .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: .75rem; margin-bottom: 1.5rem; }
+    .tile { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: .9rem 1rem; }
+    .tile b { display: block; font-size: 1.6rem; font-variant-numeric: tabular-nums; }
+    .tile span { font-size: .8rem; color: var(--muted); }
+    .tablebox { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); }
+    table { border-collapse: collapse; width: 100%; font-size: .86rem; }
+    th, td { padding: .55rem .7rem; text-align: left; border-bottom: 1px solid var(--line); white-space: nowrap; }
+    th { font-weight: 600; color: var(--ink-soft); background: var(--bg); position: sticky; top: 0; }
+    td.num { text-align: right; font-variant-numeric: tabular-nums; }
+    .pill { display: inline-block; padding: .1rem .5rem; border-radius: 999px; font-size: .75rem; font-weight: 600; }
+    .pill.active { background: var(--ok-soft); color: var(--ok); }
+    .pill.pending_payment { background: var(--bg-deep); color: var(--muted); }
+    .warn { color: var(--err); font-weight: 600; }
+  </style>
+</head>
+<body>
+<header class="topbar">
+  <a href="/" class="brand"><img src="/static/favicon.svg" alt="" /><span>Confetti</span></a>
+</header>
+<main>
+  <h1>Admin</h1>
+  <form class="login" id="login">
+    <input class="input" type="password" id="token" placeholder="Admin token" autocomplete="off" />
+    <button class="btn btn-sm" type="submit">Load report</button>
+    <span class="hint" id="msg"></span>
+  </form>
+  <div class="tiles" id="tiles" hidden></div>
+  <div class="tablebox" id="tablebox" hidden>
+    <table>
+      <thead><tr>
+        <th>Couple</th><th>Status</th><th>Created</th><th>Paid</th><th class="num">Photos</th><th class="num">Size</th>
+        <th>Last upload</th><th>Downloaded</th><th>Deleted all</th><th>Free-up</th><th>From guest of</th><th>Email</th>
+      </tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+  </div>
+</main>
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const day = (iso) => (iso ? new Date(iso).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "2-digit" }) : "");
+const size = (b) => (b >= 1e9 ? (b / 1e9).toFixed(2) + " GB" : b >= 1e6 ? (b / 1e6).toFixed(1) + " MB" : b ? (b / 1e3).toFixed(0) + " KB" : "0");
+try { $("token").value = sessionStorage.getItem("confetti_admin") || ""; } catch {}
+
+$("login").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const token = $("token").value.trim();
+  $("msg").textContent = "Loading…";
+  const res = await fetch("/api/admin/report", { headers: { "X-Admin-Token": token } }).catch(() => null);
+  if (!res || !res.ok) { $("msg").textContent = res && res.status === 401 ? "Wrong token." : "Couldn't load the report."; return; }
+  try { sessionStorage.setItem("confetti_admin", token); } catch {}
+  const data = await res.json();
+  $("msg").textContent = "";
+  const t = data.totals;
+  $("tiles").innerHTML = [
+    ["Galleries", t.galleries], ["Active", t.active], ["Paid", t.paid], ["From guests", t.from_guests],
+    ["Photos", t.photos], ["Storage", size(t.bytes)],
+  ].map(([k, v]) => `<div class="tile"><b>${esc(v)}</b><span>${k}</span></div>`).join("");
+  $("rows").innerHTML = data.galleries.map((g) => `<tr>
+    <td>${esc(g.names)} <span class="hint">/${esc(g.slug)}</span></td>
+    <td><span class="pill ${esc(g.status)}">${g.status === "active" ? "Active" : "Unpaid"}</span></td>
+    <td>${day(g.created_at)}</td><td>${day(g.paid_at)}</td>
+    <td class="num">${g.photos}</td><td class="num">${size(g.bytes)}</td>
+    <td>${day(g.last_upload)}</td><td>${day(g.last_download_at)}</td><td>${day(g.all_deleted_at)}</td>
+    <td>${g.files_freed_at ? "Freed " + day(g.files_freed_at) : g.freeup_warned_at ? `<span class="warn">Warned ${day(g.freeup_warned_at)}</span>` : ""}</td>
+    <td>${esc(g.referred_by || "")}</td><td>${esc(g.email || "")}</td></tr>`).join("");
+  $("tiles").hidden = false; $("tablebox").hidden = false;
+});
+</script>
+</body>
+</html>

@@ -10,6 +10,7 @@ import time
 from datetime import datetime, timezone
 
 import config
+import main
 import storage
 from db import Event, SessionLocal
 
@@ -360,3 +361,88 @@ def test_unknown_or_bad_ref_is_ignored(client, signup):
     slug = signup(access_code="FREE-TEST").json()["slug"]
     assert _event(slug).referred_by is None
     assert client.get("/?ref=<script>").status_code == 200
+
+
+# ── WED-34: storage housekeeping ───────────────────────────────────────────
+
+def _photo(key, when):
+    return {"Key": key, "LastModified": when, "ETag": "x", "Size": 1000}
+
+
+def test_download_and_delete_all_are_recorded(client, signup, monkeypatch):
+    slug = signup(access_code="FREE-TEST").json()["slug"]
+    ev = _event(slug)
+    monkeypatch.setattr(storage, "list_prefix", lambda p: [_photo(storage.photos_prefix(ev.storage_prefix) + "g/a.jpg", datetime.now(timezone.utc))])
+    monkeypatch.setattr(storage, "head", lambda k: {"Metadata": {"sig": "nope"}})
+    monkeypatch.setattr(main, "_build_zip", lambda *a: None)
+    assert client.get(f"/api/e/{slug}/download-zip", follow_redirects=False).status_code == 302
+    assert _event(slug).last_download_at is not None
+    monkeypatch.setattr(storage, "delete_prefix", lambda p: 0)
+    client.post(f"/api/e/{slug}/delete-all")
+    assert _event(slug).all_deleted_at is not None
+
+
+def test_freeup_warns_then_clears_and_keep_cancels(client, signup, monkeypatch):
+    from datetime import timedelta
+    sent = _capture_emails(monkeypatch)
+    slug = signup(access_code="FREE-TEST").json()["slug"]
+    now = datetime.now(timezone.utc)
+    taken = now - timedelta(days=70)
+    with SessionLocal() as db:
+        db.query(Event).filter(Event.slug == slug).first().last_download_at = taken
+        db.commit()
+    prefix = storage.photos_prefix(_event(slug).storage_prefix)
+    monkeypatch.setattr(storage, "list_prefix", lambda p: [_photo(prefix + "g/a.jpg", taken - timedelta(days=1))] if "/photos/" in p else [])
+    wiped = []
+    monkeypatch.setattr(storage, "delete_prefix", lambda p: wiped.append(p) or 1)
+
+    with SessionLocal() as db:
+        r1 = main.run_freeup(db)
+    assert slug in r1["warned"] and slug in r1["zips_cleared"]
+    assert sent and "cleared" in sent[-1]["subject"]
+    assert client.get(f"/api/e/{slug}/storage").json()["clear_on"]
+
+    with SessionLocal() as db:   # still inside the 14-day grace: nothing deleted
+        assert main.run_freeup(db)["freed"] == []
+    with SessionLocal() as db:
+        db.query(Event).filter(Event.slug == slug).first().freeup_warned_at = now - timedelta(days=15)
+        db.commit()
+    with SessionLocal() as db:
+        assert main.run_freeup(db)["freed"] == [slug]
+    assert _event(slug).files_freed_at is not None
+    assert any(p == prefix for p in wiped)
+
+
+def test_keep_my_photos_cancels_the_warning(client, signup):
+    slug = signup(access_code="FREE-TEST").json()["slug"]
+    with SessionLocal() as db:
+        db.query(Event).filter(Event.slug == slug).first().freeup_warned_at = datetime.now(timezone.utc)
+        db.commit()
+    assert client.post(f"/api/e/{slug}/keep").status_code == 200
+    assert _event(slug).freeup_warned_at is None
+
+
+def test_new_uploads_after_download_block_the_freeup(client, signup, monkeypatch):
+    from datetime import timedelta
+    _capture_emails(monkeypatch)
+    slug = signup(access_code="FREE-TEST").json()["slug"]
+    old = datetime.now(timezone.utc) - timedelta(days=90)
+    with SessionLocal() as db:
+        db.query(Event).filter(Event.slug == slug).first().last_download_at = old
+        db.commit()
+    monkeypatch.setattr(storage, "list_prefix", lambda p: [_photo("x/photos/g/new.jpg", old + timedelta(days=5))])
+    monkeypatch.setattr(storage, "delete_prefix", lambda p: 0)
+    with SessionLocal() as db:
+        assert main.run_freeup(db)["warned"] == []
+
+
+def test_admin_report_needs_token_and_counts(client, signup, monkeypatch):
+    origin = signup(access_code="FREE-TEST", email="a@example.com").json()["slug"]
+    client.cookies.clear(); client.get(f"/?ref={origin}")
+    signup(access_code="FREE-TEST", email="b@example.com")
+    monkeypatch.setattr(storage, "list_prefix", lambda p: [_photo(p + "photos/g/a.jpg", datetime.now(timezone.utc))])
+    assert client.get("/api/admin/report").status_code == 401
+    rep = client.get("/api/admin/report", headers={"X-Admin-Token": "test-admin"}).json()
+    assert rep["totals"]["galleries"] == 2 and rep["totals"]["from_guests"] == 1
+    assert rep["totals"]["photos"] == 2 and rep["totals"]["bytes"] == 2000
+    assert client.get("/admin").status_code == 200

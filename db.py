@@ -54,6 +54,12 @@ class Event(Base):
     # WED-6: set to paid_at + EVENT_TTL_DAYS; cleanup deletes everything past this.
     expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
+    # WED-34: storage housekeeping
+    last_download_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    all_deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    freeup_warned_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    files_freed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
 
 class PasswordReset(Base):
     """One-time password reset link. Only a hash of the token is stored, so a
@@ -93,6 +99,10 @@ SessionLocal = sessionmaker(bind=engine, expire_on_commit=False)
 ADDED_COLUMNS = [
     "storage_prefix VARCHAR(120)",
     "referred_by VARCHAR(16)",
+    "last_download_at TIMESTAMPTZ",
+    "all_deleted_at TIMESTAMPTZ",
+    "freeup_warned_at TIMESTAMPTZ",
+    "files_freed_at TIMESTAMPTZ",
 ]
 
 
